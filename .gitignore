@@ -1,0 +1,15 @@
+# Credenciais e Segurança 
+config/credenciais.php
+config/db.php
+
+# Pastas de sistema e IDE
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Ficheiros temporários e logs
+*.log
+/cache/
+/logs/
+/vendor/
