@@ -17,7 +17,7 @@ $stmt = $pdo->prepare("SELECT * FROM servicos WHERE barbearia_id = ? AND ativo =
 $stmt->execute([$id_barbearia]);
 $servicos = $stmt->fetchAll();
 
-$stmt = $pdo->prepare("SELECT nome, foto_url FROM utilizadores WHERE barbearia_id = ? AND tipo = 'barbeiro' AND ativo = 1");
+$stmt = $pdo->prepare("SELECT nome, foto_url, bio, especialidades, instagram FROM utilizadores WHERE barbearia_id = ? AND tipo = 'barbeiro' AND ativo = 1");
 $stmt->execute([$id_barbearia]);
 $equipa = $stmt->fetchAll();
 
