@@ -72,6 +72,13 @@ function resolverBarbearia(PDO $pdo, string $slug): array {
     return $b;
 }
 
+/** Token de acesso a uma marcação: HMAC do id + cliente (sem guardar nada na BD). */
+function tokenMarcacao(int $marcacaoId, int $clienteId): string {
+    $segredo = (string)(credenciais()['api_segredo'] ?? '');
+    if (strlen($segredo) < 32) throw new RuntimeException('api_segredo em falta ou demasiado curto em credenciais.php');
+    return hash_hmac('sha256', $marcacaoId . '|' . $clienteId, $segredo);
+}
+
 /** URL base do site (até à pasta que contém api/), ex.: http://host/projeto/projeto/ */
 function urlBaseSite(): string {
     $https  = !empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off';

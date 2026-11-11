@@ -172,6 +172,122 @@ function criarMarcacao(PDO $pdo, array $barbearia, array $dados): array {
     ];
 }
 
+/** Marcação com dados de apresentação; só de barbearias ativas. */
+function carregarMarcacaoPorId(PDO $pdo, int $id): ?array {
+    $st = $pdo->prepare(
+        "SELECT m.id, m.barbearia_id, b.nome AS barbearia_nome, b.slug AS barbearia_slug, m.cliente_id, c.email,
+                m.estado, m.inicio, m.fim, m.codigo_expira_em, m.tentativas_validacao,
+                s.nome AS servico_nome, u.nome AS barbeiro_nome
+         FROM marcacoes m
+         JOIN barbearias   b ON b.id = m.barbearia_id AND b.ativa = 1
+         JOIN clientes     c ON c.id = m.cliente_id  AND c.barbearia_id = m.barbearia_id
+         JOIN servicos     s ON s.id = m.servico_id  AND s.barbearia_id = m.barbearia_id
+         JOIN utilizadores u ON u.id = m.barbeiro_id AND u.barbearia_id = m.barbearia_id
+         WHERE m.id = ?"
+    );
+    $st->execute([$id]);
+    $m = $st->fetch(PDO::FETCH_ASSOC);
+    return $m ?: null;
+}
+
+/** Aplica expiração e limite de tentativas (normalizarEstado de publico/verificar.php). */
+function normalizarEstadoMarcacao(PDO $pdo, array $m): array {
+    if ($m['estado'] === 'pendente_verificacao') {
+        $expirou = $m['codigo_expira_em'] !== null && strtotime((string)$m['codigo_expira_em']) < time();
+        if ($expirou || (int)$m['tentativas_validacao'] >= MAX_TENTATIVAS_CODIGO) {
+            $pdo->prepare("UPDATE marcacoes SET estado = 'expirada' WHERE id = ? AND barbearia_id = ? AND estado = 'pendente_verificacao'")
+                ->execute([(int)$m['id'], (int)$m['barbearia_id']]);
+            $m['estado'] = 'expirada';
+        }
+    }
+    return $m;
+}
+
+/** Só se verifica/reenvia uma marcação pendente; os outros estados dão erro explícito. */
+function exigirPendente(array $m): void {
+    if ($m['estado'] === 'pendente_verificacao') return;
+    if ($m['estado'] === 'confirmada') throw new ReservaErro(409, 'ja_confirmada', 'Esta marcação já está confirmada.');
+    throw new ReservaErro(410, 'expirada', 'O prazo para confirmar esta marcação terminou. Faz uma nova marcação.');
+}
+
+/** Valida o código; em sucesso confirma a marcação e devolve-a atualizada. */
+function verificarCodigo(PDO $pdo, array $m, string $codigo): array {
+    $m = normalizarEstadoMarcacao($pdo, $m);
+    exigirPendente($m);
+    $id  = (int)$m['id'];
+    $bid = (int)$m['barbearia_id'];
+
+    $codigo = preg_replace('/\D/', '', $codigo);
+    if (strlen($codigo) !== 6) throw new ReservaErro(422, 'codigo_invalido', 'O código tem 6 dígitos.');
+
+    $st = $pdo->prepare("SELECT codigo_hash FROM verificacoes WHERE marcacao_id = ? ORDER BY id DESC LIMIT 1");
+    $st->execute([$id]);
+    $hash = (string)$st->fetchColumn();
+
+    if ($hash === '' || !password_verify($codigo, $hash)) {
+        $pdo->prepare("UPDATE marcacoes SET tentativas_validacao = tentativas_validacao + 1 WHERE id = ? AND barbearia_id = ?")
+            ->execute([$id, $bid]);
+        $m = normalizarEstadoMarcacao($pdo, carregarMarcacaoPorId($pdo, $id) ?? $m);
+        if ($m['estado'] === 'expirada') {
+            throw new ReservaErro(410, 'expirada', 'Demasiadas tentativas. A marcação foi cancelada; podes fazer uma nova.');
+        }
+        throw new ReservaErro(422, 'codigo_errado', 'Código incorreto.', [
+            'tentativas_restantes' => max(0, MAX_TENTATIVAS_CODIGO - (int)$m['tentativas_validacao']),
+        ]);
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $up = $pdo->prepare(
+            "UPDATE marcacoes SET estado = 'confirmada', verificado_em = ?, codigo_expira_em = NULL
+             WHERE id = ? AND barbearia_id = ? AND estado = 'pendente_verificacao'"
+        );
+        $up->execute([agoraSql(), $id, $bid]);
+        if ($up->rowCount() !== 1) throw new ReservaErro(409, 'ja_confirmada', 'Esta marcação já está confirmada.');
+        $pdo->prepare("UPDATE clientes SET email_verificado = 1, ultima_verificacao = ? WHERE id = ? AND barbearia_id = ?")
+            ->execute([agoraSql(), (int)$m['cliente_id'], $bid]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+    return carregarMarcacaoPorId($pdo, $id) ?? $m;
+}
+
+/**
+ * Gera e envia um novo código (regras de publico/verificar.php: MAX_REENVIOS, repõe tentativas e prazo).
+ * @return array{codigo_expira_em:string, codigo:string, email_enviado:bool}
+ */
+function reenviarCodigo(PDO $pdo, array $m): array {
+    $m = normalizarEstadoMarcacao($pdo, $m);
+    exigirPendente($m);
+    $id  = (int)$m['id'];
+    $bid = (int)$m['barbearia_id'];
+
+    $st = $pdo->prepare("SELECT COUNT(*) FROM verificacoes WHERE marcacao_id = ?");
+    $st->execute([$id]);
+    if ((int)$st->fetchColumn() > MAX_REENVIOS) {
+        throw new ReservaErro(429, 'limite_reenvios', 'Já pediste o número máximo de reenvios. Contacta a barbearia.');
+    }
+    if (!filter_var((string)$m['email'], FILTER_VALIDATE_EMAIL)) {
+        throw new ReservaErro(422, 'sem_email', 'Não temos um email válido para esta marcação.');
+    }
+
+    $novo   = gerarCodigo();
+    $expira = (new DateTime())->modify('+' . CODIGO_VALIDADE_MIN . ' minutes')->format('Y-m-d H:i:s');
+    $st = $pdo->prepare("INSERT INTO verificacoes (marcacao_id, canal, destino, codigo_hash, sucesso) VALUES (?, 'email', ?, ?, 0)");
+    $st->execute([$id, (string)$m['email'], password_hash($novo, PASSWORD_DEFAULT)]);
+    $verifId = (int)$pdo->lastInsertId();
+    $pdo->prepare("UPDATE marcacoes SET codigo_expira_em = ?, tentativas_validacao = 0 WHERE id = ? AND barbearia_id = ? AND estado = 'pendente_verificacao'")
+        ->execute([$expira, $id, $bid]);
+
+    $emailBarb = (string)(configBarbearia($pdo, $bid)['email_contacto'] ?? '');
+    $enviado = enviarCodigoEmail((string)$m['email'], (string)$m['barbearia_nome'], $novo, $emailBarb);
+    if ($enviado) $pdo->prepare("UPDATE verificacoes SET sucesso = 1 WHERE id = ?")->execute([$verifId]);
+
+    return ['codigo_expira_em' => $expira, 'codigo' => $novo, 'email_enviado' => $enviado];
+}
+
 /** Garante que o barbeiro é reservável nesta barbearia (mesma lista que o web mostra). */
 function barbeiroDaBarbearia(PDO $pdo, int $bid, int $barbeiroId): array {
     foreach (barbeirosReservaveis($pdo, $bid) as $b) {

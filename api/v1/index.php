@@ -143,6 +143,31 @@ function h_criar_marcacao(PDO $pdo, array $p): never {
     responder($out, 201);
 }
 
+function marcacaoOu404(PDO $pdo, string $id): array {
+    $m = ctype_digit($id) ? carregarMarcacaoPorId($pdo, (int)$id) : null;
+    if (!$m) erro(404, 'marcacao_nao_encontrada', 'Marcação não encontrada.');
+    return $m;
+}
+
+function h_verificar(PDO $pdo, array $p): never {
+    $m = marcacaoOu404($pdo, $p[0]);
+    $codigo = corpoJson()['codigo'] ?? '';
+    $ok = verificarCodigo($pdo, $m, is_scalar($codigo) ? (string)$codigo : '');
+    responder([
+        'marcacao_id' => (int)$ok['id'],
+        'estado'      => $ok['estado'],
+        'token'       => tokenMarcacao((int)$ok['id'], (int)$ok['cliente_id']),
+    ]);
+}
+
+function h_reenviar(PDO $pdo, array $p): never {
+    $m   = marcacaoOu404($pdo, $p[0]);
+    $res = reenviarCodigo($pdo, $m);
+    $out = ['codigo_expira_em' => $res['codigo_expira_em'], 'email_enviado' => $res['email_enviado']];
+    if (modoDev()) $out['codigo_dev'] = $res['codigo'];
+    responder($out);
+}
+
 /* ===================== Router ===================== */
 
 $rotas = [
@@ -152,6 +177,8 @@ $rotas = [
     ['GET', '#^barbearias/([a-z0-9-]+)/reviews$#', 'h_reviews'],
     ['GET', '#^barbearias/([a-z0-9-]+)/disponibilidade$#', 'h_disponibilidade'],
     ['POST', '#^barbearias/([a-z0-9-]+)/marcacoes$#', 'h_criar_marcacao'],
+    ['POST', '#^marcacoes/(\d+)/verificar$#', 'h_verificar'],
+    ['POST', '#^marcacoes/(\d+)/reenviar$#', 'h_reenviar'],
 ];
 
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
