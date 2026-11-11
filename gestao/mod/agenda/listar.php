@@ -181,7 +181,7 @@ $slug = (string)$sl->fetchColumn();
     <?php if (!$marcacoes): ?>
         <div class="vazio">
             <p>Sem marcações para este período.</p>
-            <?php if ($slug): ?><p style="margin-top:.6rem;font-size:.9rem;">Os clientes podem marcar em <a href="../publico/marcar.php?slug=<?= e(rawurlencode($slug)) ?>" target="_blank" rel="noopener">a página de marcação</a>.</p><?php endif; ?>
+            <?php if ($slug): ?><p style="margin-top:.6rem;font-size:.9rem;">Os clientes podem marcar em <a href="../index.php?m=marcar&amp;slug=<?= e(rawurlencode($slug)) ?>" target="_blank" rel="noopener">a página de marcação</a>.</p><?php endif; ?>
         </div>
     <?php else: ?>
         <?php foreach ($porDia as $diaStr => $lista): ?>
