@@ -346,6 +346,113 @@ function teste_listar(): void {
     teste_listar_leitura();
 }
 
+/* ===================== Cancelar e remarcar pelo cliente ===================== */
+function bdTeste(): PDO {
+    static $pdo = null;
+    if ($pdo === null) { require __DIR__ . '/../../../config/db.php'; }
+    return $pdo;
+}
+
+/** Cria e confirma uma marcação (código devolvido em modo dev); devolve [id, token]. */
+function marcacaoConfirmada(string $hora, string $tel, array $extra = []): array {
+    $r = novaMarcacao($hora, $tel, EMAIL_TESTE, $extra);
+    guardarPendente($r);
+    $id = (int)($r['json']['marcacao_id'] ?? 0);
+    $v = acao($id, 'verificar', ['codigo' => (string)($r['json']['codigo_dev'] ?? '')]);
+    return [$id, (string)($v['json']['token'] ?? '')];
+}
+
+function moverInicio(int $id, int $segundosDeAgora): void {
+    // A API usa Europe/Lisbon; o PHP da linha de comandos pode ter outro fuso (aqui: Europe/Berlin)
+    $ini = (new DateTime('@' . (time() + $segundosDeAgora)))->setTimezone(new DateTimeZone('Europe/Lisbon'))->format('Y-m-d H:i:s');
+    bdTeste()->prepare("UPDATE marcacoes SET inicio = ?, fim = DATE_ADD(?, INTERVAL 30 MINUTE) WHERE id = ?")->execute([$ini, $ini, $id]);
+}
+
+/** Antecedência da RLBarber só para o teste (null = apagar a chave, volta às 24 h por omissão). */
+function antecedenciaTeste(?int $horas): void {
+    $GLOBALS['antecedencia_mexida'] = $horas !== null;   // limpar_dados_teste repõe se o teste parar a meio
+    $pdo = bdTeste();
+    $pdo->prepare("DELETE FROM configuracoes WHERE barbearia_id = 1 AND chave = 'antecedencia_alteracao_horas'")->execute();
+    if ($horas !== null) {
+        $pdo->prepare("INSERT INTO configuracoes (barbearia_id, chave, valor) VALUES (1, 'antecedencia_alteracao_horas', ?)")->execute([(string)$horas]);
+    }
+}
+
+function notasMarcacao(int $id): string {
+    $st = bdTeste()->prepare("SELECT COALESCE(notas, '') FROM marcacoes WHERE id = ?");
+    $st->execute([$id]);
+    return (string)$st->fetchColumn();
+}
+
+function teste_alterar(): void {
+    $s   = $GLOBALS['slot_teste'] ?? null;
+    $id  = (int)($GLOBALS['marcacao']['id'] ?? 0);
+    $tok = (string)($GLOBALS['token'] ?? '');
+    if (!$s || !$id || $tok === '') { verifica(false, 'marcação confirmada das tasks anteriores'); return; }
+    $horas = $GLOBALS['horas_teste'];
+
+    $r = pedido('GET', 'barbearias/rlbarber');
+    verifica(($r['json']['antecedencia_alteracao_horas'] ?? null) === 24, 'barbearia inclui antecedencia_alteracao_horas = 24 por omissão', $r);
+    $r = pedido('GET', 'marcacoes', null, ['tokens' => "$id:$tok"]);
+    $m = $r['json'][0] ?? [];
+    verifica(($m['servico_id'] ?? null) === $s['servico_id'] && ($m['barbeiro_id'] ?? null) === $s['barbeiro_id'], 'lista inclui servico_id e barbeiro_id', $r);
+
+    // Review Focus 3: token adulterado ou de outra marcação → 404
+    $adulterado = substr($tok, 0, -1) . ($tok[-1] === 'a' ? 'b' : 'a');
+    $r = pedido('POST', "marcacoes/$id/cancelar", ['token' => $adulterado]);
+    verifica($r['status'] === 404 && ($r['json']['erro']['codigo'] ?? '') === 'marcacao_nao_encontrada', 'cancelar com token adulterado 404', $r);
+    $outro = (int)($GLOBALS['marcacoes_extra'][1] ?? 0);
+    $r = pedido('POST', "marcacoes/$outro/cancelar", ['token' => $tok]);
+    verifica($r['status'] === 404, 'cancelar com token de outra marcação 404', $r);
+    $r = pedido('POST', "marcacoes/$id/remarcar", ['token' => $adulterado, 'barbeiro_id' => $s['barbeiro_id'], 'data' => $s['data'], 'hora' => $horas[0]]);
+    verifica($r['status'] === 404, 'remarcar com token adulterado 404', $r);
+
+    // O dia de teste pode ser amanhã (menos de 24 h): para os casos de remarcar, antecedência 0
+    antecedenciaTeste(0);
+    $r = pedido('GET', 'barbearias/rlbarber');
+    verifica(($r['json']['antecedencia_alteracao_horas'] ?? null) === 0, 'antecedência configurada (0) chega à API', $r);
+
+    // Review Focus 1: o horário seguinte sobrepõe-se ao da própria marcação e tem de ser aceite
+    $seguinte = $s['slots'][array_search($horas[0], $s['slots'], true) + 1] ?? null;
+    $r = pedido('POST', "marcacoes/$id/remarcar", ['token' => $tok, 'barbeiro_id' => $s['barbeiro_id'], 'data' => $s['data'], 'hora' => $seguinte]);
+    verifica($r['status'] === 200 && ($r['json']['estado'] ?? '') === 'confirmada' && ($r['json']['inicio'] ?? '') === "{$s['data']} $seguinte:00",
+        'remarcar para horário sobreposto ao próprio 200', $r);
+    verifica(($r['json']['barbeiro_id'] ?? null) === $s['barbeiro_id'] && is_string($r['json']['servico_nome'] ?? null), 'resposta no formato da lista', $r);
+    verifica(str_contains(notasMarcacao($id), 'Remarcada pelo cliente na app'), 'notas com o rasto da remarcação');
+
+    $r = pedido('POST', "marcacoes/$id/remarcar", ['token' => $tok, 'barbeiro_id' => $s['barbeiro_id'], 'data' => $s['data'], 'hora' => $horas[1]]);
+    verifica($r['status'] === 409 && ($r['json']['erro']['codigo'] ?? '') === 'slot_ocupado', 'remarcar para horário ocupado 409', $r);
+    $r = pedido('POST', "marcacoes/$id/remarcar", ['token' => $tok, 'barbeiro_id' => $s['barbeiro_id'], 'data' => $s['data'], 'hora' => '25:00']);
+    verifica($r['status'] === 422, 'remarcar com hora inválida 422', $r);
+
+    // A mesma pessoa já tem marcação noutro dia (a pendente r3 da Task 4)
+    $dias = outrosDiasComSlot(2);
+    if (count($dias) === 2) {
+        $r = pedido('POST', "marcacoes/$id/remarcar", ['token' => $tok, 'barbeiro_id' => $s['barbeiro_id'], 'data' => $dias[1][0], 'hora' => $dias[1][1]]);
+        verifica($r['status'] === 409 && ($r['json']['erro']['codigo'] ?? '') === 'marcacao_no_dia', 'remarcar para dia em que a pessoa já tem marcação 409', $r);
+    } else {
+        verifica(false, 'há 2 outros dias com horários livres');
+    }
+
+    // Review Focus 5: limite do prazo (24 h, valor por omissão)
+    antecedenciaTeste(null);
+    $GLOBALS['tel_alt'] = '9150001' . substr($GLOBALS['tel_digitos'], -2);
+    [$b, $tokB] = marcacaoConfirmada($horas[3], $GLOBALS['tel_alt']);
+    verifica($b > 0 && $tokB !== '', 'segunda marcação confirmada para os testes de prazo');
+    moverInicio($b, 24 * 3600 - 120);
+    $r = pedido('POST', "marcacoes/$b/cancelar", ['token' => $tokB]);
+    verifica($r['status'] === 409 && ($r['json']['erro']['codigo'] ?? '') === 'fora_do_prazo', 'cancelar a menos de 24 h 409 fora_do_prazo', $r);
+    $r = pedido('POST', "marcacoes/$b/remarcar", ['token' => $tokB, 'barbeiro_id' => $s['barbeiro_id'], 'data' => $s['data'], 'hora' => $horas[3]]);
+    verifica($r['status'] === 409 && ($r['json']['erro']['codigo'] ?? '') === 'fora_do_prazo', 'remarcar a menos de 24 h 409 fora_do_prazo', $r);
+
+    moverInicio($id, 24 * 3600 + 120);
+    $r = pedido('POST', "marcacoes/$id/cancelar", ['token' => $tok]);
+    verifica($r['status'] === 200 && ($r['json']['estado'] ?? '') === 'cancelada', 'cancelar a mais de 24 h 200 cancelada', $r);
+    verifica(str_contains(notasMarcacao($id), 'Cancelada pelo cliente na app'), 'notas com o rasto do cancelamento');
+    $r = pedido('POST', "marcacoes/$id/cancelar", ['token' => $tok]);
+    verifica($r['status'] === 409 && ($r['json']['erro']['codigo'] ?? '') === 'estado_invalido', 'cancelar de novo 409 estado_invalido', $r);
+}
+
 /** Parte só-leitura (segura para correr na UA). */
 function teste_listar_leitura(): void {
     $r = pedido('GET', 'marcacoes', null, ['tokens' => 'lixo']);
@@ -356,7 +463,8 @@ function teste_listar_leitura(): void {
 
 /** Apaga tudo o que os testes criaram (só em local: usa a BD diretamente). */
 function limpar_dados_teste(): void {
-    $tels = array_filter([$GLOBALS['tel_digitos'] ?? null, $GLOBALS['tel_outro'] ?? null]);
+    if (!empty($GLOBALS['antecedencia_mexida'])) antecedenciaTeste(null);
+    $tels = array_filter([$GLOBALS['tel_digitos'] ?? null, $GLOBALS['tel_outro'] ?? null, $GLOBALS['tel_alt'] ?? null]);
     if (!$tels) return;
     require __DIR__ . '/../../../config/db.php';
     $marcas = implode(',', array_fill(0, count($tels), '?'));
@@ -406,7 +514,7 @@ function teste_sempre_json(): void {
 
 /* ===================== Execução ===================== */
 $leitura = ['teste_segredo', 'teste_politica_codigo','teste_barbearia','teste_catalogo', 'teste_disponibilidade', 'teste_sempre_json'];
-$escrita = ['teste_criar_marcacao', 'teste_verificar', 'teste_listar'];
+$escrita = ['teste_criar_marcacao', 'teste_verificar', 'teste_listar', 'teste_alterar'];
 
 foreach ($leitura as $t) { if (function_exists($t)) { echo "--- $t\n"; $t(); } }
 if ($SO_LEITURA) {

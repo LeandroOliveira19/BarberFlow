@@ -45,6 +45,7 @@ function h_barbearia(PDO $pdo, array $p): never {
         'hora_fecho'          => $hora('hora_fecho'),
         'max_dias'            => MAX_DIAS,
         'codigo_validade_min' => CODIGO_VALIDADE_MIN,
+        'antecedencia_alteracao_horas' => antecedenciaAlteracaoHoras($cfg),
     ]);
 }
 
@@ -185,20 +186,52 @@ function h_listar_marcacoes(PDO $pdo, array $p): never {
         if (!$m || !hash_equals(tokenMarcacao((int)$m['id'], (int)$m['cliente_id']), $tok)) continue;
         if (!isset($expiradas[$m['barbearia_id']])) { expirarPendentes($pdo, (int)$m['barbearia_id']); $expiradas[$m['barbearia_id']] = true; }
         $m = normalizarEstadoMarcacao($pdo, carregarMarcacaoPorId($pdo, $id) ?? $m);
-        $lista[] = [
-            'id'             => (int)$m['id'],
-            'estado'         => $m['estado'],
-            'inicio'         => $m['inicio'],
-            'fim'            => $m['fim'],
-            'servico_nome'   => $m['servico_nome'],
-            'para_nome'      => $m['para_nome'],
-            'barbeiro_nome'  => $m['barbeiro_nome'],
-            'barbearia_slug' => $m['barbearia_slug'],
-            'barbearia_nome' => $m['barbearia_nome'],
-        ];
+        $lista[] = itemMarcacao($m);
     }
     usort($lista, fn($a, $b) => strcmp($b['inicio'], $a['inicio']));
     responder($lista);
+}
+
+/** Formato público de uma marcação (lista, cancelar, remarcar): sem dados do cliente. */
+function itemMarcacao(array $m): array {
+    return [
+        'id'             => (int)$m['id'],
+        'estado'         => $m['estado'],
+        'inicio'         => $m['inicio'],
+        'fim'            => $m['fim'],
+        'servico_id'     => (int)$m['servico_id'],
+        'servico_nome'   => $m['servico_nome'],
+        'para_nome'      => $m['para_nome'],
+        'barbeiro_id'    => (int)$m['barbeiro_id'],
+        'barbeiro_nome'  => $m['barbeiro_nome'],
+        'barbearia_slug' => $m['barbearia_slug'],
+        'barbearia_nome' => $m['barbearia_nome'],
+    ];
+}
+
+/** Marcação cujo token (o mesmo da lista) é válido; caso contrário 404, sem revelar se existe. */
+function marcacaoComToken(PDO $pdo, string $id, array $corpo): array {
+    $m = ctype_digit($id) ? carregarMarcacaoPorId($pdo, (int)$id) : null;
+    $tok = $corpo['token'] ?? '';
+    if (!$m || !is_string($tok) || !hash_equals(tokenMarcacao((int)$m['id'], (int)$m['cliente_id']), $tok)) {
+        erro(404, 'marcacao_nao_encontrada', 'Marcação não encontrada.');
+    }
+    return $m;
+}
+
+/** POST marcacoes/{id}/cancelar {token} */
+function h_cancelar(PDO $pdo, array $p): never {
+    $m = marcacaoComToken($pdo, $p[0], corpoJson());
+    cancelarMarcacaoCliente($pdo, $m);
+    responder(itemMarcacao(carregarMarcacaoPorId($pdo, (int)$m['id'])));
+}
+
+/** POST marcacoes/{id}/remarcar {token, barbeiro_id, data, hora} */
+function h_remarcar(PDO $pdo, array $p): never {
+    $corpo = corpoJson();
+    $m = marcacaoComToken($pdo, $p[0], $corpo);
+    remarcarMarcacaoCliente($pdo, $m, $corpo);
+    responder(itemMarcacao(carregarMarcacaoPorId($pdo, (int)$m['id'])));
 }
 
 /* ===================== Router ===================== */
@@ -212,6 +245,8 @@ $rotas = [
     ['POST', '#^barbearias/([a-z0-9-]+)/marcacoes$#', 'h_criar_marcacao'],
     ['POST', '#^marcacoes/(\d+)/verificar$#', 'h_verificar'],
     ['POST', '#^marcacoes/(\d+)/reenviar$#', 'h_reenviar'],
+    ['POST', '#^marcacoes/(\d+)/cancelar$#', 'h_cancelar'],
+    ['POST', '#^marcacoes/(\d+)/remarcar$#', 'h_remarcar'],
     ['GET', '#^marcacoes$#', 'h_listar_marcacoes'],
 ];
 
