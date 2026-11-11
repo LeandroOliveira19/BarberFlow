@@ -168,6 +168,34 @@ function h_reenviar(PDO $pdo, array $p): never {
     responder($out);
 }
 
+/** GET marcacoes?tokens=id:tok,id:tok — só devolve marcações cujo token é válido. */
+function h_listar_marcacoes(PDO $pdo, array $p): never {
+    $pares = [];
+    foreach (array_slice(explode(',', (string)($_GET['tokens'] ?? '')), 0, 50) as $par) {
+        if (preg_match('/^(\d{1,10}):([0-9a-f]{64})$/', trim($par), $m)) $pares[(int)$m[1]] = $m[2];
+    }
+    $lista = [];
+    $expiradas = [];
+    foreach ($pares as $id => $tok) {
+        $m = carregarMarcacaoPorId($pdo, $id);
+        if (!$m || !hash_equals(tokenMarcacao((int)$m['id'], (int)$m['cliente_id']), $tok)) continue;
+        if (!isset($expiradas[$m['barbearia_id']])) { expirarPendentes($pdo, (int)$m['barbearia_id']); $expiradas[$m['barbearia_id']] = true; }
+        $m = normalizarEstadoMarcacao($pdo, carregarMarcacaoPorId($pdo, $id) ?? $m);
+        $lista[] = [
+            'id'             => (int)$m['id'],
+            'estado'         => $m['estado'],
+            'inicio'         => $m['inicio'],
+            'fim'            => $m['fim'],
+            'servico_nome'   => $m['servico_nome'],
+            'barbeiro_nome'  => $m['barbeiro_nome'],
+            'barbearia_slug' => $m['barbearia_slug'],
+            'barbearia_nome' => $m['barbearia_nome'],
+        ];
+    }
+    usort($lista, fn($a, $b) => strcmp($b['inicio'], $a['inicio']));
+    responder($lista);
+}
+
 /* ===================== Router ===================== */
 
 $rotas = [
@@ -179,6 +207,7 @@ $rotas = [
     ['POST', '#^barbearias/([a-z0-9-]+)/marcacoes$#', 'h_criar_marcacao'],
     ['POST', '#^marcacoes/(\d+)/verificar$#', 'h_verificar'],
     ['POST', '#^marcacoes/(\d+)/reenviar$#', 'h_reenviar'],
+    ['GET', '#^marcacoes$#', 'h_listar_marcacoes'],
 ];
 
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';

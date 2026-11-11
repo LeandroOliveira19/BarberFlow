@@ -260,6 +260,40 @@ function teste_verificar(): void {
     verifica($r3['status'] === 429 && ($r3['json']['erro']['codigo'] ?? '') === 'limite_reenvios', '3.º reenvio 429', $r3);
 }
 
+/* ===================== Task 6 ===================== */
+function teste_listar(): void {
+    $id = (int)($GLOBALS['marcacao']['id'] ?? 0);
+    $tok = (string)($GLOBALS['token'] ?? '');
+    if (!$id || $tok === '') { verifica(false, 'token obtido na Task 5'); return; }
+
+    $r = pedido('GET', 'marcacoes', null, ['tokens' => "$id:$tok"]);
+    verifica($r['status'] === 200 && count((array)$r['json']) === 1, 'lista com 1 marcação', $r);
+    $m = $r['json'][0] ?? [];
+    verifica(($m['id'] ?? null) === $id && ($m['estado'] ?? '') === 'confirmada', 'id e estado confirmada', $r);
+    verifica(($m['barbearia_slug'] ?? '') === 'rlbarber' && is_string($m['servico_nome'] ?? null) && is_string($m['barbeiro_nome'] ?? null), 'resumo da marcação', $r);
+    verifica(preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', (string)($m['inicio'] ?? '')) === 1, 'inicio formatado', $r);
+    verifica(!array_key_exists('email', $m) && !array_key_exists('cliente_id', $m), 'sem dados do cliente', $r);
+
+    // Review Focus 4: token adulterado ou usado com outro id não revela nada
+    $adulterado = substr($tok, 0, -1) . ($tok[-1] === 'a' ? 'b' : 'a');
+    $r = pedido('GET', 'marcacoes', null, ['tokens' => "$id:$adulterado"]);
+    verifica($r['status'] === 200 && $r['json'] === [], 'token adulterado → []', $r);
+    $outro = (int)($GLOBALS['marcacoes_extra'][1] ?? ($id + 1));
+    $r = pedido('GET', 'marcacoes', null, ['tokens' => "$outro:$tok"]);
+    verifica($r['status'] === 200 && $r['json'] === [], 'token de outra marcação → []', $r);
+    $r = pedido('GET', 'marcacoes', null, ['tokens' => "$id:$adulterado,$id:$tok,lixo,:,999999:abc"]);
+    verifica(count((array)$r['json']) === 1, 'pares inválidos ignorados, válido mantido', $r);
+    teste_listar_leitura();
+}
+
+/** Parte só-leitura (segura para correr na UA). */
+function teste_listar_leitura(): void {
+    $r = pedido('GET', 'marcacoes', null, ['tokens' => 'lixo']);
+    verifica($r['status'] === 200 && $r['json'] === [], 'tokens=lixo → [] 200', $r);
+    $r = pedido('GET', 'marcacoes');
+    verifica($r['status'] === 200 && $r['json'] === [], 'sem tokens → [] 200', $r);
+}
+
 /** Apaga tudo o que os testes criaram (só em local: usa a BD diretamente). */
 function limpar_dados_teste(): void {
     $tels = array_filter([$GLOBALS['tel_digitos'] ?? null, $GLOBALS['tel_outro'] ?? null]);
