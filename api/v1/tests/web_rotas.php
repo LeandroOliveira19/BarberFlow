@@ -151,6 +151,61 @@ function teste_agenda_perfil(): void {
     ok(str_contains($r['html'], 'Perfil atualizado com sucesso') && str_contains($r['html'], 'Gestor Teste 2'), 'mensagem de sucesso e nome novo', $r);
 }
 
+/* ===================== Task 4: módulos só de gestor ===================== */
+function servicoTesteExiste(PDO $pdo, string $nome): bool {
+    $st = $pdo->prepare("SELECT COUNT(*) FROM servicos WHERE barbearia_id = 1 AND nome = ? AND ativo = 1");
+    $st->execute([$nome]);
+    return (int)$st->fetchColumn() > 0;
+}
+
+function teste_modulos_gestor(): void {
+    global $BASE, $pdo;
+    $GLOBALS['LIMPEZA'][] = "DELETE FROM servicos WHERE barbearia_id = 1 AND nome LIKE 'Serviço Rotas%'";
+    $GLOBALS['LIMPEZA'][] = "DELETE FROM fornecedores WHERE barbearia_id = 1 AND nome = 'Fornecedor Rotas'";
+    $g = new Sessao($BASE); $g->login(TESTE_GESTOR);
+    $b = new Sessao($BASE); $b->login(TESTE_BARBEIRO);
+
+    $leituras = ['servicos' => 'listar', 'barbeiros' => 'listar', 'bancadas' => 'listar', 'fornecedores' => 'listar', 'definicoes' => 'editar'];
+    $titulos  = ['servicos' => 'Serviços', 'barbeiros' => 'Barbeiros', 'bancadas' => 'Bancadas', 'fornecedores' => 'Fornecedores', 'definicoes' => 'Definições'];
+    foreach ($leituras as $m => $a) {
+        $r = $g->get("gestao/index.php?m=$m&a=$a");
+        ok($r['status'] === 200 && str_contains($r['html'], $titulos[$m]) && semErrosPhp($r['html']) && !str_contains($r['html'], 'Página não encontrada'),
+           "gestor: $m/$a 200", $r);
+        $r = $b->get("gestao/index.php?m=$m&a=$a");
+        ok($r['status'] === 200 && str_contains($r['html'], 'Página não encontrada'), "barbeiro: $m é só de gestor", $r);
+        $r = $g->get("gestao/$m.php");
+        ok($r['status'] === 302 && str_contains($r['local'], "m=$m"), "$m.php antigo redireciona", $r);
+    }
+
+    // Criar → editar → apagar um serviço pela gestão (Review Focus 4: os 302 provam que não há saída antes do header)
+    $r = $g->get('gestao/index.php?m=servicos&a=listar');
+    $csrf = Sessao::csrf($r['html']);
+    $r = $g->post('gestao/index.php?m=servicos&a=guardar', ['nome' => 'Serviço Rotas', 'duracao_minutos' => 30, 'preco' => '9,50', 'descricao' => '', 'csrf' => $csrf]);
+    ok($r['status'] === 302 && str_contains($r['local'], 'a=listar') && servicoTesteExiste($pdo, 'Serviço Rotas'), 'gestor cria serviço', $r);
+    $r = $g->get('gestao/index.php?m=servicos&a=listar');
+    ok(str_contains($r['html'], 'Serviço adicionado com sucesso'), 'mensagem de sucesso ao criar', $r);
+    $id = (int)$pdo->query("SELECT id FROM servicos WHERE barbearia_id = 1 AND nome = 'Serviço Rotas'")->fetchColumn();
+    $r = $g->get("gestao/index.php?m=servicos&a=listar&editar=$id");
+    ok(str_contains($r['html'], 'value="Serviço Rotas"'), 'link Editar carrega o serviço no formulário', $r);
+    $r = $g->post('gestao/index.php?m=servicos&a=guardar', ['id' => $id, 'nome' => 'Serviço Rotas 2', 'duracao_minutos' => 45, 'preco' => '10', 'csrf' => $csrf]);
+    ok(servicoTesteExiste($pdo, 'Serviço Rotas 2'), 'gestor edita serviço', $r);
+    $r = $g->post('gestao/index.php?m=servicos&a=guardar', ['nome' => '', 'preco' => '0', 'csrf' => $csrf]);
+    $r = $g->get('gestao/index.php?m=servicos&a=listar');
+    ok(str_contains($r['html'], 'O nome e o preço são obrigatórios'), 'erro de validação chega por mensagem', $r);
+
+    // Review Focus 2: barbeiro com CSRF válido a chamar uma ação de gestor
+    $rb = $b->get('gestao/index.php?m=agenda&a=listar');
+    $r = $b->post('gestao/index.php?m=servicos&a=apagar', ['id' => $id, 'csrf' => Sessao::csrf($rb['html'])]);
+    ok(servicoTesteExiste($pdo, 'Serviço Rotas 2'), 'barbeiro NÃO consegue apagar serviço (POST direto)', $r);
+
+    $r = $g->post('gestao/index.php?m=servicos&a=apagar', ['id' => $id, 'csrf' => $csrf]);
+    ok(!servicoTesteExiste($pdo, 'Serviço Rotas 2'), 'gestor desativa serviço', $r);
+
+    $r = $g->post('gestao/index.php?m=fornecedores&a=guardar', ['nome' => 'Fornecedor Rotas', 'csrf' => $csrf]);
+    $n = (int)$pdo->query("SELECT COUNT(*) FROM fornecedores WHERE barbearia_id = 1 AND nome = 'Fornecedor Rotas'")->fetchColumn();
+    ok($n === 1 && $r['status'] === 302, 'gestor cria fornecedor', $r);
+}
+
 /* ===================== Execução ===================== */
 try {
     criarUtilizadoresTeste($pdo);

@@ -36,6 +36,11 @@ $MODULOS = [
         'dashboard' => ['ver'],
         'agenda'    => ['listar', 'estado'],
         'perfil'    => ['editar', 'guardar', 'alterar_password'],
+        'servicos'     => ['listar', 'guardar', 'apagar'],
+        'barbeiros'    => ['listar', 'criar', 'editar', 'apagar', 'ativar'],
+        'bancadas'     => ['listar', 'criar', 'editar', 'apagar', 'ativar'],
+        'fornecedores' => ['listar', 'guardar'],
+        'definicoes'   => ['editar', 'guardar'],
     ],
     'barbeiro' => [
         'dashboard' => ['ver'],
