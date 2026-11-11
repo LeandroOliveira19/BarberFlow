@@ -55,9 +55,11 @@ final class Sessao {
     }
 }
 
-/** Página sem avisos/erros PHP visíveis. */
+/** Página sem avisos/erros PHP visíveis nem marcas PHP soltas no texto (ex.: "?>" duplicado ao mover código). */
 function semErrosPhp(string $html): bool {
-    return !preg_match('/(Warning|Notice|Deprecated|Fatal error|Parse error|Uncaught)\b.*?(on line|in \/|in [A-Z]:)/s', $html);
+    if (preg_match('/(Warning|Notice|Deprecated|Fatal error|Parse error|Uncaught)\b.*?(on line|in \/|in [A-Z]:)/s', $html)) return false;
+    $texto = strip_tags(preg_replace('#<(script|style)\b.*?</\1>#s', '', $html));
+    return !str_contains($texto, '?>') && !str_contains($texto, '<?');
 }
 
 /** Cria (ou recria) um gestor e um barbeiro de teste na barbearia 1. Devolve [gestorId, barbeiroId]. */
