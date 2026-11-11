@@ -101,6 +101,17 @@ function exigirTokenPendente(array $m, array $corpo): void {
     }
 }
 
+/**
+ * Decide se a resposta pode incluir o código de confirmação (campo codigo_dev):
+ *  - sempre, em desenvolvimento local ('api_dev_devolver_codigo' => true);
+ *  - só quando o email falhou, se 'api_codigo_se_email_falhar' => true
+ *    (servidor da UA: não deixa sair pedidos para o Brevo, por isso o email nunca chega).
+ */
+function deveDevolverCodigo(array $cred, bool $emailEnviado): bool {
+    if (($cred['api_dev_devolver_codigo'] ?? false) === true) return true;
+    return !$emailEnviado && ($cred['api_codigo_se_email_falhar'] ?? false) === true;
+}
+
 /** URL base do site (até à pasta que contém api/), ex.: http://host/projeto/projeto/ */
 function urlBaseSite(): string {
     $https  = !empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off';

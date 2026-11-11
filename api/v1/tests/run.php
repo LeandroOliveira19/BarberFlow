@@ -345,6 +345,17 @@ function teste_segredo(): void {
     verifica(function_exists('segredoValido') && !segredoValido(''), 'segredo vazio rejeitado');
 }
 
+/* ===================== Código no ecrã quando o email falha (UA sem acesso externo) ===================== */
+function teste_politica_codigo(): void {
+    require_once __DIR__ . '/../_lib.php';
+    $ok = function_exists('deveDevolverCodigo');
+    verifica($ok && deveDevolverCodigo(['api_dev_devolver_codigo' => true], true), 'modo dev devolve sempre');
+    verifica($ok && deveDevolverCodigo(['api_codigo_se_email_falhar' => true], false), 'email falhou + opção ligada devolve');
+    verifica($ok && !deveDevolverCodigo(['api_codigo_se_email_falhar' => true], true), 'email enviado nunca devolve (sem dev)');
+    verifica($ok && !deveDevolverCodigo([], false), 'sem opções nunca devolve');
+    verifica($ok && !deveDevolverCodigo(['api_codigo_se_email_falhar' => 'sim'], false), 'só aceita true literal');
+}
+
 /** Review Focus 3: todas as rotas GET respondem JSON válido */
 function teste_sempre_json(): void {
     $rotas = [
@@ -359,7 +370,7 @@ function teste_sempre_json(): void {
 }
 
 /* ===================== Execução ===================== */
-$leitura = ['teste_segredo', 'teste_barbearia','teste_catalogo', 'teste_disponibilidade', 'teste_sempre_json'];
+$leitura = ['teste_segredo', 'teste_politica_codigo','teste_barbearia','teste_catalogo', 'teste_disponibilidade', 'teste_sempre_json'];
 $escrita = ['teste_criar_marcacao', 'teste_verificar', 'teste_listar'];
 
 foreach ($leitura as $t) { if (function_exists($t)) { echo "--- $t\n"; $t(); } }

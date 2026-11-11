@@ -21,6 +21,7 @@ return [
     // API v1 (app mobile)
     'api_segredo' => 'GERAR_COM_bin2hex(random_bytes(32))',
     'api_dev_devolver_codigo' => false, // true só em desenvolvimento local
+    'api_codigo_se_email_falhar' => false, // true num servidor sem acesso ao Brevo (ex.: UA): a app mostra o código
 
     // Opcional: BD local de desenvolvimento (sem estas chaves usa a BD da UA)
     // 'db_host' => '127.0.0.1', 'db_user' => 'root', 'db_pass' => '',

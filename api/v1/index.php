@@ -128,7 +128,6 @@ function h_disponibilidade(PDO $pdo, array $p): never {
     responder(['data' => $dia->format('Y-m-d'), 'slots' => array_values($slots)]);
 }
 
-function modoDev(): bool { return (credenciais()['api_dev_devolver_codigo'] ?? false) === true; }
 
 function h_criar_marcacao(PDO $pdo, array $p): never {
     $b = resolverBarbearia($pdo, $p[0]);
@@ -141,7 +140,7 @@ function h_criar_marcacao(PDO $pdo, array $p): never {
         'email_enviado'    => $res['email_enviado'],
         'token_pendente'   => tokenPendente($res['marcacao_id'], $res['cliente_id']),
     ];
-    if (modoDev() && $res['codigo'] !== null) $out['codigo_dev'] = $res['codigo'];
+    if ($res['codigo'] !== null && deveDevolverCodigo(credenciais(), $res['email_enviado'])) $out['codigo_dev'] = $res['codigo'];
     responder($out, 201);
 }
 
@@ -169,7 +168,7 @@ function h_reenviar(PDO $pdo, array $p): never {
     exigirTokenPendente($m, corpoJson());
     $res = reenviarCodigo($pdo, $m);
     $out = ['codigo_expira_em' => $res['codigo_expira_em'], 'email_enviado' => $res['email_enviado']];
-    if (modoDev()) $out['codigo_dev'] = $res['codigo'];
+    if (deveDevolverCodigo(credenciais(), $res['email_enviado'])) $out['codigo_dev'] = $res['codigo'];
     responder($out);
 }
 
