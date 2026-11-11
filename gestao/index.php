@@ -41,11 +41,14 @@ $MODULOS = [
         'bancadas'     => ['listar', 'criar', 'editar', 'apagar', 'ativar'],
         'fornecedores' => ['listar', 'guardar'],
         'definicoes'   => ['editar', 'guardar'],
+        'stock'        => ['listar', 'guardar', 'apagar', 'transferir'],
+        'pedidos'      => ['listar', 'aprovar', 'rejeitar', 'entregar'],
     ],
     'barbeiro' => [
         'dashboard' => ['ver'],
         'agenda'    => ['listar', 'estado'],
         'perfil'    => ['editar', 'guardar', 'alterar_password'],
+        'stock'     => ['listar', 'pedir_reposicao'],   // a sua bancada
     ],
 ];
 

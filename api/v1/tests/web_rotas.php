@@ -206,6 +206,67 @@ function teste_modulos_gestor(): void {
     ok($n === 1 && $r['status'] === 302, 'gestor cria fornecedor', $r);
 }
 
+/* ===================== Task 5: stock e pedidos ===================== */
+function teste_stock_pedidos(): void {
+    global $BASE, $pdo;
+    // Material e bancada de teste para o barbeiro de teste (bancada_materiais tem PK composta, sem id)
+    $barb = (int)$pdo->query("SELECT id FROM utilizadores WHERE email = '" . TESTE_BARBEIRO . "'")->fetchColumn();
+    $pdo->prepare("INSERT INTO materiais (barbearia_id, nome, unidade, stock_geral, stock_minimo, tipo) VALUES (1, 'Material Rotas', 'un', 50, 5, 'material')")->execute();
+    $mat = (int)$pdo->lastInsertId();
+    $pdo->prepare("INSERT INTO bancadas (barbearia_id, nome, barbeiro_id) VALUES (1, 'Bancada Rotas', ?)")->execute([$barb]);
+    $banc = (int)$pdo->lastInsertId();
+    $pdo->prepare("INSERT INTO bancada_materiais (bancada_id, material_id, quantidade, quantidade_minima) VALUES (?, ?, 2, 1)")->execute([$banc, $mat]);
+    $GLOBALS['LIMPEZA'][] = "DELETE FROM pedidos_reposicao WHERE material_id = $mat";
+    $GLOBALS['LIMPEZA'][] = "DELETE FROM movimentos_stock WHERE material_id = $mat";
+    $GLOBALS['LIMPEZA'][] = "DELETE FROM bancada_materiais WHERE material_id = $mat";
+    $GLOBALS['LIMPEZA'][] = "DELETE FROM bancadas WHERE id = $banc";
+    $GLOBALS['LIMPEZA'][] = "DELETE FROM materiais WHERE id = $mat";
+
+    $g = new Sessao($BASE); $g->login(TESTE_GESTOR);
+    $b = new Sessao($BASE); $b->login(TESTE_BARBEIRO);
+
+    $r = $g->get('gestao/index.php?m=stock&a=listar');
+    ok($r['status'] === 200 && str_contains($r['html'], 'Stock Geral') && semErrosPhp($r['html']), 'gestor: stock/listar 200', $r);
+    $r = $g->get('gestao/index.php?m=pedidos&a=listar');
+    ok($r['status'] === 200 && str_contains($r['html'], 'Pedidos') && semErrosPhp($r['html']), 'gestor: pedidos/listar 200', $r);
+    $r = $b->get('gestao/index.php?m=stock&a=listar');
+    ok($r['status'] === 200 && str_contains($r['html'], 'Minha Bancada') && str_contains($r['html'], 'Material Rotas') && semErrosPhp($r['html']), 'barbeiro: a sua bancada', $r);
+    $csrfB = Sessao::csrf($r['html']);
+    $r = $b->get('gestao/index.php?m=pedidos&a=listar');
+    ok(str_contains($r['html'], 'Página não encontrada'), 'barbeiro: pedidos é só de gestor', $r);
+
+    // Barbeiro não consegue transferir stock (ação de gestor) mesmo com CSRF válido
+    $antes = (float)$pdo->query("SELECT stock_geral FROM materiais WHERE id = $mat")->fetchColumn();
+    $r = $b->post('gestao/index.php?m=stock&a=transferir', ['material_id' => $mat, 'bancada_id' => $banc, 'quantidade' => 5, 'csrf' => $csrfB]);
+    $depois = (float)$pdo->query("SELECT stock_geral FROM materiais WHERE id = $mat")->fetchColumn();
+    ok($antes === $depois, 'barbeiro NÃO transfere stock', $r);
+
+    // Barbeiro pede reposição → gestor rejeita
+    $r = $b->post('gestao/index.php?m=stock&a=pedir_reposicao', ['material_id' => $mat, 'quantidade' => 3, 'csrf' => $csrfB]);
+    $pedido = $pdo->query("SELECT id, estado FROM pedidos_reposicao WHERE material_id = $mat ORDER BY id DESC LIMIT 1")->fetch(PDO::FETCH_ASSOC);
+    ok($r['status'] === 302 && ($pedido['estado'] ?? '') === 'pendente', 'barbeiro pede reposição (pendente)', $r);
+    $r = $b->get('gestao/index.php?m=stock&a=listar');
+    ok(str_contains($r['html'], 'Pedido de reposição enviado'), 'mensagem do pedido aparece', $r);
+
+    $rg = $g->get('gestao/index.php?m=pedidos&a=listar');
+    $r = $g->post('gestao/index.php?m=pedidos&a=rejeitar', ['id' => (int)($pedido['id'] ?? 0), 'csrf' => Sessao::csrf($rg['html'])]);
+    $estado = $pdo->query("SELECT estado FROM pedidos_reposicao WHERE id = " . (int)($pedido['id'] ?? 0))->fetchColumn();
+    ok($estado === 'rejeitado' && $r['status'] === 302, 'gestor rejeita o pedido', $r);
+
+    // Gestor transfere stock geral → bancada
+    $r = $g->post('gestao/index.php?m=stock&a=transferir', ['material_id' => $mat, 'bancada_id' => $banc, 'quantidade' => 5, 'csrf' => Sessao::csrf($rg['html'])]);
+    $geral = (float)$pdo->query("SELECT stock_geral FROM materiais WHERE id = $mat")->fetchColumn();
+    $naBancada = (float)$pdo->query("SELECT quantidade FROM bancada_materiais WHERE bancada_id = $banc AND material_id = $mat")->fetchColumn();
+    ok($geral === 45.0 && $naBancada === 7.0, 'gestor transfere 5 unidades (50→45, bancada 2→7)', $r);
+
+    $r = $g->get("gestao/index.php?m=stock&a=listar&transferir=$mat");
+    ok(str_contains($r['html'], 'Material Rotas') && semErrosPhp($r['html']), 'link Transferir abre o formulário', $r);
+    foreach (['stock', 'pedidos'] as $m) {
+        $r = $g->get("gestao/$m.php");
+        ok($r['status'] === 302 && str_contains($r['local'], "m=$m"), "$m.php antigo redireciona", $r);
+    }
+}
+
 /* ===================== Execução ===================== */
 try {
     criarUtilizadoresTeste($pdo);
