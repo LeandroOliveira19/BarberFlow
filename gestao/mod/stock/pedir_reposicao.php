@@ -1,0 +1,16 @@
+<?php
+declare(strict_types=1);
+// Módulo: stock / pedir_reposicao — (POST) O CSRF e o perfil já foram validados pelo gestao/index.php.
+if (count(get_included_files()) === 1) { header('Location: ../../index.php'); exit; }
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirecionar(urlModulo('stock', 'listar'));
+
+require_once __DIR__ . '/_comum.php';
+$msg = '';
+$erro = '';
+$acao = 'pedir_reposicao';
+require __DIR__ . '/_processar.php';
+
+if ($erro) flash('erro', $erro);
+if ($msg) flash('sucesso', $msg);
+redirecionar(urlModulo('stock', 'listar'));
