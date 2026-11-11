@@ -105,6 +105,47 @@ function teste_catalogo(): void {
     }
 }
 
+/* ===================== Task 3 ===================== */
+function teste_disponibilidade(): void {
+    $sv = (int)($GLOBALS['servicos'][0]['id'] ?? 0);
+    $rota = 'barbearias/rlbarber/disponibilidade';
+    $encontrado = null;
+    foreach ($GLOBALS['equipa'] ?? [] as $barb) {
+        for ($d = 1; $d <= 14 && !$encontrado; $d++) {
+            $data = (new DateTime('today'))->modify("+$d days")->format('Y-m-d');
+            $r = pedido('GET', $rota, null, ['servico_id' => $sv, 'barbeiro_id' => $barb['id'], 'data' => $data]);
+            if ($r['status'] !== 200) { verifica(false, "disponibilidade $data 200", $r); return; }
+            if (!empty($r['json']['slots'])) $encontrado = [$sv, (int)$barb['id'], $data, $r['json']];
+        }
+        if ($encontrado) break;
+    }
+    verifica($encontrado !== null, 'há pelo menos um dia com slots livres nos próximos 14 dias');
+    if (!$encontrado) return;
+    [$sv, $bb, $data, $json] = $encontrado;
+    verifica($json['data'] === $data, 'data ecoada');
+    $formatoOk = array_reduce($json['slots'], fn($ok, $h) => $ok && preg_match('/^\d{2}:\d{2}$/', $h) === 1, true);
+    verifica($formatoOk, 'slots no formato HH:MM');
+    $GLOBALS['slot_teste'] = ['servico_id' => $sv, 'barbeiro_id' => $bb, 'data' => $data, 'slots' => $json['slots']];
+
+    $ontem = (new DateTime('yesterday'))->format('Y-m-d');
+    $r = pedido('GET', $rota, null, ['servico_id' => $sv, 'barbeiro_id' => $bb, 'data' => $ontem]);
+    verifica($r['status'] === 422 && ($r['json']['erro']['codigo'] ?? '') === 'data_invalida', 'data passada 422', $r);
+    $longe = (new DateTime('today'))->modify('+31 days')->format('Y-m-d');
+    $r = pedido('GET', $rota, null, ['servico_id' => $sv, 'barbeiro_id' => $bb, 'data' => $longe]);
+    verifica($r['status'] === 422, 'data além de MAX_DIAS 422', $r);
+    $r = pedido('GET', $rota, null, ['servico_id' => $sv, 'barbeiro_id' => $bb, 'data' => '2026-02-30']);
+    verifica($r['status'] === 422, 'data inexistente 422', $r);
+    $r = pedido('GET', $rota, null, ['servico_id' => 999999, 'barbeiro_id' => $bb, 'data' => $data]);
+    verifica($r['status'] === 404 && ($r['json']['erro']['codigo'] ?? '') === 'servico_nao_encontrado', 'serviço inexistente 404', $r);
+    $r = pedido('GET', $rota, null, ['servico_id' => $sv, 'barbeiro_id' => 999999, 'data' => $data]);
+    verifica($r['status'] === 404 && ($r['json']['erro']['codigo'] ?? '') === 'barbeiro_nao_encontrado', 'barbeiro inexistente 404', $r);
+    $r = pedido('GET', $rota, null, ['servico_id' => $sv, 'data' => $data]);
+    verifica($r['status'] === 400 && ($r['json']['erro']['codigo'] ?? '') === 'parametros_invalidos', 'sem barbeiro_id 400', $r);
+    // Isolamento: barbeiro da RLBarber pedido através de outra barbearia
+    $r = pedido('GET', 'barbearias/navalha/disponibilidade', null, ['servico_id' => $sv, 'barbeiro_id' => $bb, 'data' => $data]);
+    verifica($r['status'] === 404, 'serviço/barbeiro de outra barbearia 404', $r);
+}
+
 /** Review Focus 3: todas as rotas GET respondem JSON válido */
 function teste_sempre_json(): void {
     $rotas = [

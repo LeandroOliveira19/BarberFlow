@@ -13,6 +13,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') responder(null, 204);
 
 require __DIR__ . '/../../config/db.php';
 require_once __DIR__ . '/../../config/marcacoes.php';
+require_once __DIR__ . '/../../config/reservas.php';
 
 ini_set('display_errors', '0');
 set_exception_handler(function (Throwable $e): void {
@@ -103,6 +104,30 @@ function h_reviews(PDO $pdo, array $p): never {
     ], array_filter((array)$itens, 'is_array'))));
 }
 
+/** Inteiro positivo de $_GET ou erro 400. */
+function paramInt(string $nome): int {
+    $v = $_GET[$nome] ?? null;
+    if (!is_string($v) || !ctype_digit($v) || (int)$v <= 0) erro(400, 'parametros_invalidos', 'Pedido incompleto ou inválido.');
+    return (int)$v;
+}
+
+function h_disponibilidade(PDO $pdo, array $p): never {
+    $b        = resolverBarbearia($pdo, $p[0]);
+    $servico  = paramInt('servico_id');
+    $barbeiro = paramInt('barbeiro_id');
+    $dataStr  = (string)($_GET['data'] ?? '');
+    if ($dataStr === '') erro(400, 'parametros_invalidos', 'Pedido incompleto ou inválido.');
+
+    $s   = servicoDaBarbearia($pdo, $b['id'], $servico);
+    barbeiroDaBarbearia($pdo, $b['id'], $barbeiro);
+    $dia = validarDataMarcacao($dataStr);
+
+    expirarPendentes($pdo, $b['id']);
+    $cfg   = configBarbearia($pdo, $b['id']);
+    $slots = slotsLivres($pdo, $b['id'], $barbeiro, $dia, (int)$s['duracao_minutos'], $cfg, false);
+    responder(['data' => $dia->format('Y-m-d'), 'slots' => array_values($slots)]);
+}
+
 /* ===================== Router ===================== */
 
 $rotas = [
@@ -110,6 +135,7 @@ $rotas = [
     ['GET', '#^barbearias/([a-z0-9-]+)/servicos$#', 'h_servicos'],
     ['GET', '#^barbearias/([a-z0-9-]+)/equipa$#', 'h_equipa'],
     ['GET', '#^barbearias/([a-z0-9-]+)/reviews$#', 'h_reviews'],
+    ['GET', '#^barbearias/([a-z0-9-]+)/disponibilidade$#', 'h_disponibilidade'],
 ];
 
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -119,7 +145,12 @@ $metodoErrado = false;
 foreach ($rotas as [$m, $regex, $handler]) {
     if (!preg_match($regex, $rota, $match)) continue;
     if ($m !== $metodo) { $metodoErrado = true; continue; }
-    $handler($pdo, array_slice($match, 1));
+    try {
+        $handler($pdo, array_slice($match, 1));
+    } catch (ReservaErro $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        erro($e->status, $e->codigo, $e->getMessage(), $e->extra);
+    }
 }
 if ($metodoErrado) erro(405, 'metodo_nao_permitido', 'Método não permitido.');
 erro(404, 'rota_nao_encontrada', 'Recurso não encontrado.');
