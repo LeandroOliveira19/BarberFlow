@@ -34,9 +34,13 @@ $bid     = (int)$_SESSION['barbearia_id'];
 $MODULOS = [
     'gestor' => [
         'dashboard' => ['ver'],
+        'agenda'    => ['listar', 'estado'],
+        'perfil'    => ['editar', 'guardar', 'alterar_password'],
     ],
     'barbeiro' => [
         'dashboard' => ['ver'],
+        'agenda'    => ['listar', 'estado'],
+        'perfil'    => ['editar', 'guardar', 'alterar_password'],
     ],
 ];
 
