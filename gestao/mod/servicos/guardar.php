@@ -19,12 +19,10 @@ $nova_pass_info = '';
             $erro = 'O nome e o preço são obrigatórios.';
         } else {
             if ($id > 0) {
-                $stmt = $pdo->prepare("UPDATE servicos SET nome=?, duracao_minutos=?, preco=?, descricao=?, ativo=1 WHERE id=? AND barbearia_id=?");
-                $stmt->execute([$nome, $duracao, $preco, $descricao, $id, $bid]);
+                (new Servico($pdo, $bid))->update($id, ['nome' => $nome, 'duracao_minutos' => $duracao, 'preco' => $preco, 'descricao' => $descricao]);
                 $msg = 'Serviço atualizado com sucesso.';
             } else {
-                $stmt = $pdo->prepare("INSERT INTO servicos (barbearia_id, nome, duracao_minutos, preco, descricao) VALUES (?, ?, ?, ?, ?)");
-                $stmt->execute([$bid, $nome, $duracao, $preco, $descricao]);
+                (new Servico($pdo, $bid))->create(['nome' => $nome, 'duracao_minutos' => $duracao, 'preco' => $preco, 'descricao' => $descricao]);
                 $msg = 'Serviço adicionado com sucesso.';
             }
         }

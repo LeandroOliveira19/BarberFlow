@@ -6,15 +6,12 @@ if (count(get_included_files()) === 1) { header('Location: ../../index.php'); ex
 $msg = '';
 $erro = '';
 
-$stmt = $pdo->prepare("SELECT * FROM fornecedores WHERE barbearia_id = ? AND ativo = 1 ORDER BY nome");
-$stmt->execute([$bid]);
-$fornecedores = $stmt->fetchAll();
+$fornecedor   = new Fornecedor($pdo, $bid);   // objects/Fornecedor.php (CRUD em POO)
+$fornecedores = $fornecedor->read();
 
 $editar = null;
 if (isset($_GET['editar'])) {
-    $stmt = $pdo->prepare("SELECT * FROM fornecedores WHERE id = ? AND barbearia_id = ?");
-    $stmt->execute([(int)$_GET['editar'], $bid]);
-    $editar = $stmt->fetch();
+    $editar = $fornecedor->readOne((int)$_GET['editar']);
 }
 ?>
 

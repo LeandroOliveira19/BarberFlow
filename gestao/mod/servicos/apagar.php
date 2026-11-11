@@ -10,8 +10,7 @@ $erro = '';
 $nova_pass_info = '';
 
         $id = (int)$_POST['id'];
-        $stmt = $pdo->prepare("UPDATE servicos SET ativo = 0 WHERE id = ? AND barbearia_id = ?");
-        $stmt->execute([$id, $bid]);
+        (new Servico($pdo, $bid))->delete($id);
         $msg = 'Serviço desativado com sucesso.';
 
 if ($erro) flash('erro', $erro);

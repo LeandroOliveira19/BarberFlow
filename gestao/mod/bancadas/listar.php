@@ -14,48 +14,18 @@ $TIPOS = [
     'brinde'      => 'Brindes',
 ];
 $ORDEM_TIPOS = ['equipamento', 'material', 'produto', 'brinde'];
+$bancada = new Bancada($pdo, $bid);   // objects/Bancada.php (CRUD em POO)
+
 // 2. Ver se estamos a editar
 $editar = null;
 if (isset($_GET['editar'])) {
-    $stmt = $pdo->prepare("SELECT * FROM bancadas WHERE id = ? AND barbearia_id = ?");
-    $stmt->execute([(int)$_GET['editar'], $bid]);
-    $editar = $stmt->fetch();
+    $editar = $bancada->readOne((int)$_GET['editar']);
 }
 
-// 3. Listar bancadas com nome do barbeiro
-$stmt = $pdo->prepare("
-    SELECT b.*, u.nome AS barbeiro_nome
-    FROM bancadas b
-    LEFT JOIN utilizadores u ON b.barbeiro_id = u.id
-    WHERE b.barbearia_id = ?
-    ORDER BY b.id ASC
-");
-$stmt->execute([$bid]);
-$bancadas = $stmt->fetchAll();
-
-// 4. Listar barbeiros livres para o dropdown
-$stmt = $pdo->prepare("
-    SELECT u.id, u.nome FROM utilizadores u
-    LEFT JOIN bancadas b ON u.id = b.barbeiro_id AND b.ativo = 1
-    WHERE u.barbearia_id = ? AND u.tipo = 'barbeiro' AND u.ativo = 1 AND (b.id IS NULL OR b.id = ?)
-");
-$stmt->execute([$bid, $editar['id'] ?? 0]);
-$barbeiros_livres = $stmt->fetchAll();
-
-// 5. Materiais de cada bancada, agrupados por tipo
-$materiaisPorBancada = [];
-$stmt = $pdo->prepare("
-    SELECT bm.bancada_id, bm.quantidade, bm.quantidade_minima, m.nome, m.unidade, m.tipo
-    FROM bancada_materiais bm
-    JOIN materiais m ON bm.material_id = m.id
-    WHERE m.barbearia_id = ? AND m.ativo = 1
-    ORDER BY m.nome
-");
-$stmt->execute([$bid]);
-foreach ($stmt->fetchAll() as $r) {
-    $tipo = $r['tipo'] ?? 'material';
-    $materiaisPorBancada[(int)$r['bancada_id']][$tipo][] = $r;
-}
+// 3. Bancadas com o nome do barbeiro, 4. barbeiros livres para o dropdown, 5. materiais por bancada e tipo
+$bancadas            = $bancada->read();
+$barbeiros_livres    = $bancada->barbeirosLivres((int)($editar['id'] ?? 0));
+$materiaisPorBancada = $bancada->materiaisPorBancada();
 ?>
 
 <style>

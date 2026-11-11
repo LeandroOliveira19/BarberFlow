@@ -15,6 +15,13 @@ declare(strict_types=1);
 require __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/marcacoes.php';   // utilitários partilhados (e(), corHex(), ...)
 require_once __DIR__ . '/../config/modular.php';
+
+// Classes das entidades (objects/Servico.php, ...) carregadas quando são usadas pela primeira vez
+spl_autoload_register(function (string $classe): void {
+    if (preg_match('/^[A-Z][A-Za-z]+$/', $classe) && is_file($f = __DIR__ . '/../objects/' . $classe . '.php')) {
+        require_once $f;
+    }
+});
 ini_set('display_errors', '0');
 
 session_start();
