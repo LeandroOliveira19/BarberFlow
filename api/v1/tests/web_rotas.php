@@ -267,6 +267,40 @@ function teste_stock_pedidos(): void {
     }
 }
 
+/* ===================== Task 6: parte pública ===================== */
+function teste_publico(): void {
+    global $BASE;
+    $s = new Sessao($BASE);
+    foreach (['index.php?slug=rlbarber', 'index.php', 'index.php?m=site&a=ver&slug=rlbarber'] as $u) {
+        $r = $s->get($u);
+        ok($r['status'] === 200 && str_contains($r['html'], 'RLBarber') && substr_count($r['html'], '<html') === 1 && semErrosPhp($r['html']),
+           "site: $u", $r);
+    }
+    $r = $s->get('index.php?slug=nao-existe');
+    ok($r['status'] === 404 && str_contains($r['html'], 'Barbearia não encontrada'), 'slug inexistente → 404', $r);
+    foreach (['?m=../config&a=db&slug=rlbarber', '?m=site&a=../../config/db&slug=rlbarber', '?m=gestao&a=index&slug=rlbarber'] as $q) {
+        $r = $s->get("index.php$q");
+        ok($r['status'] === 200 && str_contains($r['html'], 'RLBarber') && semErrosPhp($r['html']), "público: parâmetros inválidos $q → site", $r);
+    }
+    $r = $s->get('index.php?m=marcar&slug=rlbarber');
+    ok($r['status'] === 200 && str_contains($r['html'], 'name="servico"') && substr_count($r['html'], '<html') === 1 && semErrosPhp($r['html']),
+       'marcar/formulario 200', $r);
+    $r = $s->get('index.php?m=verificar&slug=rlbarber');
+    ok($r['status'] === 302, 'verificar sem marcação em curso → redireciona', $r);
+    foreach (['mod/marcar/formulario.php', 'mod/verificar/formulario.php', 'mod/site/ver.php', 'mod/site/temas/classico.php'] as $f) {
+        $r = $s->get($f);
+        ok($r['status'] === 302 && str_contains($r['local'], 'index.php'), "acesso direto bloqueado: $f", $r);
+    }
+    $r = $s->get('publico/index.php?slug=rlbarber');
+    ok($r['status'] === 302 && str_contains($r['local'], 'index.php?m=site') && str_contains($r['local'], 'slug=rlbarber'), 'publico/index.php antigo redireciona', $r);
+    $r = $s->get('publico/marcar.php?slug=rlbarber&servico=5');
+    ok($r['status'] === 302 && str_contains($r['local'], 'm=marcar') && str_contains($r['local'], 'servico=5'), 'publico/marcar.php antigo redireciona', $r);
+    $r = $s->get('publico/verificar.php');
+    ok($r['status'] === 302 && str_contains($r['local'], 'm=verificar'), 'publico/verificar.php antigo redireciona', $r);
+    $r = $s->post('index.php?m=marcar&slug=rlbarber', ['servico' => 5]);
+    ok($r['status'] === 302 && !str_contains($r['local'], 'm=verificar'), 'POST público sem CSRF é recusado', $r);
+}
+
 /* ===================== Execução ===================== */
 try {
     criarUtilizadoresTeste($pdo);

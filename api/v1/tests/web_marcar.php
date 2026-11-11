@@ -24,9 +24,9 @@ function http(string $url, ?array $post = null): string {
 /** Abre o passo 2 do formulário (para obter o CSRF) e submete uma marcação. */
 function marcarNoSite(int $sv, int $bb, string $data, string $hora, string $tel, string $paraNome = ''): array {
     global $BASE;
-    $pagina = http("$BASE/publico/marcar.php?slug=rlbarber&servico=$sv&barbeiro=$bb&data=$data");
+    $pagina = http("$BASE/index.php?m=marcar&slug=rlbarber&servico=$sv&barbeiro=$bb&data=$data");
     preg_match('/name="csrf" value="([0-9a-f]+)"/', $pagina, $m);
-    $html = http("$BASE/publico/marcar.php?slug=rlbarber", [
+    $html = http("$BASE/index.php?m=marcar&slug=rlbarber", [
         'csrf' => $m[1] ?? '', 'slug' => 'rlbarber', 'servico' => $sv, 'barbeiro' => $bb, 'data' => $data, 'hora' => $hora,
         'nome' => 'Teste Site', 'telemovel' => $tel, 'email' => 'site@example.com', 'para_nome' => $paraNome,
     ]);
@@ -63,7 +63,7 @@ try {
     $q = $pdo->prepare("SELECT COUNT(*) FROM marcacoes m JOIN clientes c ON c.id = m.cliente_id WHERE c.telemovel = ? AND m.para_nome = 'Tiago'");
     $q->execute([$tel]);
     $ok((int)$q->fetchColumn() === 1, 'para_nome guardado na marcação');
-    $pagina = http("$BASE/publico/marcar.php?slug=rlbarber&servico=$sv&barbeiro=$bb&data=$data");
+    $pagina = http("$BASE/index.php?m=marcar&slug=rlbarber&servico=$sv&barbeiro=$bb&data=$data");
     $ok(str_contains($pagina, 'name="para_nome"'), 'formulário tem o campo "Para quem é a marcação?"');
 } finally {
     require_once __DIR__ . '/../../../config/db.php';

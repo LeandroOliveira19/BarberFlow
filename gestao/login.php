@@ -86,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <button type="submit" class="btn-submit">Entrar</button>
         </form>
         
-        <a href="../publico/index.php?slug=rlbarber" class="back-link">← Voltar ao site</a>
+        <a href="../index.php?slug=rlbarber" class="back-link">← Voltar ao site</a>
     </div>
 </body>
 </html>
