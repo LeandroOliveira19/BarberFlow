@@ -146,6 +146,90 @@ function teste_disponibilidade(): void {
     verifica($r['status'] === 404, 'serviço/barbeiro de outra barbearia 404', $r);
 }
 
+/* ===================== Task 4 ===================== */
+const EMAIL_TESTE = 'teste+api@example.com';   // domínio reservado: o mailer não envia
+
+/** Escolhe slots espaçados de pelo menos $minutos para não se sobreporem. */
+function slotsEspacados(array $slots, int $minutos): array {
+    $res = []; $ultimo = -100000;
+    foreach ($slots as $h) {
+        [$hh, $mm] = array_map('intval', explode(':', $h));
+        $m = $hh * 60 + $mm;
+        if ($m - $ultimo >= $minutos) { $res[] = $h; $ultimo = $m; }
+    }
+    return $res;
+}
+
+function novaMarcacao(string $hora, string $telemovel, ?string $email = EMAIL_TESTE, array $extra = []): array {
+    $s = $GLOBALS['slot_teste'];
+    return pedido('POST', 'barbearias/rlbarber/marcacoes', $extra + [
+        'servico_id' => $s['servico_id'], 'barbeiro_id' => $s['barbeiro_id'], 'data' => $s['data'],
+        'hora' => $hora, 'nome' => 'Teste API', 'telemovel' => $telemovel, 'email' => $email,
+    ]);
+}
+
+function teste_criar_marcacao(): void {
+    if (empty($GLOBALS['slot_teste'])) { verifica(false, 'slot_teste disponível (Task 3)'); return; }
+    $sufixo = (string)random_int(10, 99);
+    $GLOBALS['tel_digitos'] = '9120001' . $sufixo;
+    $GLOBALS['tel_outro']   = '9130001' . $sufixo;
+    $horas = slotsEspacados($GLOBALS['slot_teste']['slots'], 120);
+    verifica(count($horas) >= 4, 'há 4 slots espaçados para os testes');
+    if (count($horas) < 4) return;
+    $GLOBALS['horas_teste'] = $horas;
+
+    $r = novaMarcacao($horas[0], '+351 912 000 1' . $sufixo);
+    verifica($r['status'] === 201, 'criar marcação 201', $r);
+    verifica(is_int($r['json']['marcacao_id'] ?? null) && ($r['json']['estado'] ?? '') === 'pendente_verificacao', 'id e estado pendente', $r);
+    verifica(preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', (string)($r['json']['codigo_expira_em'] ?? '')) === 1, 'codigo_expira_em formatado', $r);
+    verifica(strlen((string)($r['json']['codigo_dev'] ?? '')) === 6, 'codigo_dev em modo dev', $r);
+    $GLOBALS['marcacao'] = ['id' => (int)($r['json']['marcacao_id'] ?? 0), 'codigo' => (string)($r['json']['codigo_dev'] ?? '')];
+
+    // Review Focus 1: o mesmo slot não pode ser reservado duas vezes
+    $r = novaMarcacao($horas[0], $GLOBALS['tel_outro']);
+    verifica($r['status'] === 409 && ($r['json']['erro']['codigo'] ?? '') === 'slot_ocupado', 'mesmo slot 409 slot_ocupado', $r);
+    $d = pedido('GET', 'barbearias/rlbarber/disponibilidade', null, [
+        'servico_id' => $GLOBALS['slot_teste']['servico_id'], 'barbeiro_id' => $GLOBALS['slot_teste']['barbeiro_id'], 'data' => $GLOBALS['slot_teste']['data']]);
+    verifica(!in_array($horas[0], (array)($d['json']['slots'] ?? []), true), 'slot reservado deixa de estar livre', $d);
+
+    $r = novaMarcacao($horas[1], '12345');
+    verifica($r['status'] === 422 && ($r['json']['erro']['codigo'] ?? '') === 'dados_invalidos', 'telemóvel inválido 422', $r);
+    $r = novaMarcacao($horas[1], $GLOBALS['tel_outro'], '');
+    verifica($r['status'] === 422 && ($r['json']['erro']['codigo'] ?? '') === 'dados_invalidos', 'email vazio 422', $r);
+    $r = novaMarcacao('25:00', $GLOBALS['tel_outro']);
+    verifica($r['status'] === 422, 'hora inválida 422', $r);
+    $r = novaMarcacao($horas[1], $GLOBALS['tel_outro'], EMAIL_TESTE, ['nome' => 'A']);
+    verifica($r['status'] === 422, 'nome curto 422', $r);
+    $r = pedido('POST', 'barbearias/rlbarber/marcacoes', ['servico_id' => 'x']);
+    verifica($r['status'] === 400 || $r['status'] === 422, 'corpo incompleto 400/422', $r);
+
+    // Review Focus 2: formatos diferentes do mesmo telemóvel caem no mesmo cliente
+    $tel00 = '00351' . $GLOBALS['tel_digitos'];
+    $r2 = novaMarcacao($horas[1], $tel00);
+    $r3 = novaMarcacao($horas[2], $GLOBALS['tel_digitos']);
+    verifica($r2['status'] === 201 && $r3['status'] === 201, '2.ª e 3.ª marcações do mesmo cliente 201', $r3);
+    $r4 = novaMarcacao($horas[3], '+351' . $GLOBALS['tel_digitos']);
+    verifica($r4['status'] === 409 && ($r4['json']['erro']['codigo'] ?? '') === 'limite_marcacoes', '4.ª marcação ativa 409 limite_marcacoes', $r4);
+    $GLOBALS['marcacoes_extra'] = [(int)($r2['json']['marcacao_id'] ?? 0), (int)($r3['json']['marcacao_id'] ?? 0)];
+}
+
+/** Apaga tudo o que os testes criaram (só em local: usa a BD diretamente). */
+function limpar_dados_teste(): void {
+    $tels = array_filter([$GLOBALS['tel_digitos'] ?? null, $GLOBALS['tel_outro'] ?? null]);
+    if (!$tels) return;
+    require __DIR__ . '/../../../config/db.php';
+    $marcas = implode(',', array_fill(0, count($tels), '?'));
+    $ids = $pdo->prepare("SELECT id FROM clientes WHERE barbearia_id = 1 AND telemovel IN ($marcas)");
+    $ids->execute(array_values($tels));
+    $clientes = $ids->fetchAll(PDO::FETCH_COLUMN);
+    if (!$clientes) return;
+    $mc = implode(',', array_fill(0, count($clientes), '?'));
+    $pdo->prepare("DELETE v FROM verificacoes v JOIN marcacoes m ON m.id = v.marcacao_id WHERE m.cliente_id IN ($mc)")->execute($clientes);
+    $pdo->prepare("DELETE FROM marcacoes WHERE cliente_id IN ($mc)")->execute($clientes);
+    $pdo->prepare("DELETE FROM clientes WHERE id IN ($mc)")->execute($clientes);
+    echo "(limpeza: " . count($clientes) . " cliente(s) de teste removido(s))\n";
+}
+
 /** Review Focus 3: todas as rotas GET respondem JSON válido */
 function teste_sempre_json(): void {
     $rotas = [

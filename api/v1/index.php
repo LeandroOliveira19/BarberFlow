@@ -128,6 +128,21 @@ function h_disponibilidade(PDO $pdo, array $p): never {
     responder(['data' => $dia->format('Y-m-d'), 'slots' => array_values($slots)]);
 }
 
+function modoDev(): bool { return (credenciais()['api_dev_devolver_codigo'] ?? false) === true; }
+
+function h_criar_marcacao(PDO $pdo, array $p): never {
+    $b   = resolverBarbearia($pdo, $p[0]);
+    $res = criarMarcacao($pdo, $b, corpoJson());
+    $out = [
+        'marcacao_id'      => $res['marcacao_id'],
+        'estado'           => $res['estado'],
+        'codigo_expira_em' => $res['codigo_expira_em'],
+        'email_enviado'    => $res['email_enviado'],
+    ];
+    if (modoDev() && $res['codigo'] !== null) $out['codigo_dev'] = $res['codigo'];
+    responder($out, 201);
+}
+
 /* ===================== Router ===================== */
 
 $rotas = [
@@ -136,6 +151,7 @@ $rotas = [
     ['GET', '#^barbearias/([a-z0-9-]+)/equipa$#', 'h_equipa'],
     ['GET', '#^barbearias/([a-z0-9-]+)/reviews$#', 'h_reviews'],
     ['GET', '#^barbearias/([a-z0-9-]+)/disponibilidade$#', 'h_disponibilidade'],
+    ['POST', '#^barbearias/([a-z0-9-]+)/marcacoes$#', 'h_criar_marcacao'],
 ];
 
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';
