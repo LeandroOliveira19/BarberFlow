@@ -13,3 +13,10 @@ Thumbs.db
 /cache/
 /logs/
 /vendor/
+
+# Ficheiros de teste/debug
+debug_apify.php
+debug_login.php
+teste_api.php
+teste_xampp.php
+explorador.php
