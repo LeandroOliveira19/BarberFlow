@@ -47,10 +47,69 @@ function h_barbearia(PDO $pdo, array $p): never {
     ]);
 }
 
+function h_servicos(PDO $pdo, array $p): never {
+    $b  = resolverBarbearia($pdo, $p[0]);
+    $st = $pdo->prepare("SELECT id, nome, descricao, duracao_minutos, preco FROM servicos
+                         WHERE barbearia_id = ? AND ativo = 1 ORDER BY nome");
+    $st->execute([$b['id']]);
+    $lista = array_map(fn(array $s) => [
+        'id'              => (int)$s['id'],
+        'nome'            => $s['nome'],
+        'descricao'       => ($s['descricao'] ?? '') !== '' ? $s['descricao'] : null,
+        'duracao_minutos' => (int)$s['duracao_minutos'],
+        'preco'           => (float)$s['preco'],
+    ], $st->fetchAll(PDO::FETCH_ASSOC));
+    responder($lista);
+}
+
+function h_equipa(PDO $pdo, array $p): never {
+    $b   = resolverBarbearia($pdo, $p[0]);
+    $ids = array_map(fn($x) => (int)$x['id'], barbeirosReservaveis($pdo, $b['id']));
+    if (!$ids) responder([]);
+    $marcas = implode(',', array_fill(0, count($ids), '?'));
+    $st = $pdo->prepare("SELECT id, nome, foto_url, bio, especialidades, instagram FROM utilizadores
+                         WHERE barbearia_id = ? AND id IN ($marcas) ORDER BY nome");
+    $st->execute(array_merge([$b['id']], $ids));
+    $nulo = fn($v) => ($v === null || trim((string)$v) === '') ? null : trim((string)$v);
+    responder(array_map(fn(array $u) => [
+        'id'             => (int)$u['id'],
+        'nome'           => $u['nome'],
+        'foto_url'       => urlAbsoluta($u['foto_url']),
+        'bio'            => $nulo($u['bio']),
+        'especialidades' => $nulo($u['especialidades']),
+        'instagram'      => $nulo($u['instagram']),
+    ], $st->fetchAll(PDO::FETCH_ASSOC)));
+}
+
+function h_reviews(PDO $pdo, array $p): never {
+    require_once __DIR__ . '/../../config/reviews.php';
+    $b       = resolverBarbearia($pdo, $p[0]);
+    $placeId = trim((string)(configBarbearia($pdo, $b['id'])['google_place_id'] ?? ''));
+    $token   = (string)(credenciais()['apify_token'] ?? '');
+    if ($placeId === '' || $token === '') responder([]);
+    try {
+        $itens = obterReviewsApify($placeId, $token, $b['id']);
+    } catch (Throwable $e) {
+        error_log('[api/v1] reviews: ' . $e->getMessage());
+        $itens = [];
+    }
+    // A cache normalizada só tem author_name, rating e text (ver config/reviews.php)
+    responder(array_values(array_map(fn(array $r) => [
+        'autor'    => (string)($r['author_name'] ?? 'Cliente'),
+        'foto_url' => null,
+        'estrelas' => max(1, min(5, (int)($r['rating'] ?? 5))),
+        'texto'    => ($t = trim((string)($r['text'] ?? ''))) !== '' ? $t : null,
+        'data'     => null,
+    ], array_filter((array)$itens, 'is_array'))));
+}
+
 /* ===================== Router ===================== */
 
 $rotas = [
     ['GET', '#^barbearias/([a-z0-9-]+)$#', 'h_barbearia'],
+    ['GET', '#^barbearias/([a-z0-9-]+)/servicos$#', 'h_servicos'],
+    ['GET', '#^barbearias/([a-z0-9-]+)/equipa$#', 'h_equipa'],
+    ['GET', '#^barbearias/([a-z0-9-]+)/reviews$#', 'h_reviews'],
 ];
 
 $metodo = $_SERVER['REQUEST_METHOD'] ?? 'GET';

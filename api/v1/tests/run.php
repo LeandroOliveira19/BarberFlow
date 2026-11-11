@@ -74,6 +74,37 @@ function teste_barbearia(): void {
     verifica($r['status'] === 204, 'preflight CORS 204', $r);
 }
 
+/* ===================== Task 2 ===================== */
+function teste_catalogo(): void {
+    $s = pedido('GET', 'barbearias/rlbarber/servicos');
+    verifica($s['status'] === 200 && is_array($s['json']) && count($s['json']) > 0, 'servicos não vazio', $s);
+    $p = $s['json'][0] ?? [];
+    verifica(is_int($p['id'] ?? null) && is_int($p['duracao_minutos'] ?? null) && is_float($p['preco'] ?? null), 'tipos numéricos em servicos', $s);
+    verifica(!array_key_exists('ativo', $p) && !array_key_exists('barbearia_id', $p), 'servicos sem campos internos', $s);
+    $GLOBALS['servicos'] = $s['json'];
+
+    $e = pedido('GET', 'barbearias/rlbarber/equipa');
+    verifica($e['status'] === 200 && is_array($e['json']) && count($e['json']) > 0, 'equipa não vazia', $e);
+    $b = $e['json'][0] ?? [];
+    verifica(array_key_exists('instagram', $b) && array_key_exists('bio', $b) && array_key_exists('especialidades', $b), 'equipa com perfil público', $e);
+    verifica(!array_key_exists('email', $b) && !array_key_exists('password_hash', $b) && !array_key_exists('telefone', $b), 'equipa sem dados privados', $e);
+    $fotosOk = true;
+    foreach ($e['json'] as $x) { if ($x['foto_url'] !== null && !str_starts_with($x['foto_url'], 'http')) $fotosOk = false; }
+    verifica($fotosOk, 'foto_url absoluto ou null', $e);
+    $GLOBALS['equipa'] = $e['json'];
+
+    $outra = pedido('GET', 'barbearias/navalha/equipa');
+    $idsRl = array_column($e['json'], 'id');
+    verifica(!array_intersect($idsRl, array_column((array)$outra['json'], 'id')), 'equipa isolada por barbearia', $outra);
+
+    $rv = pedido('GET', 'barbearias/rlbarber/reviews');
+    verifica($rv['status'] === 200 && is_array($rv['json']), 'reviews lista', $rv);
+    if ($rv['json']) {
+        $r0 = $rv['json'][0];
+        verifica(is_string($r0['autor'] ?? null) && is_int($r0['estrelas'] ?? null) && array_key_exists('texto', $r0), 'review com autor/estrelas/texto', $rv);
+    }
+}
+
 /** Review Focus 3: todas as rotas GET respondem JSON válido */
 function teste_sempre_json(): void {
     $rotas = [
