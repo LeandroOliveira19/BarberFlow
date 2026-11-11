@@ -107,6 +107,7 @@ function teste_agenda_perfil(): void {
     foreach (['gestor' => $g, 'barbeiro' => $b] as $quem => $s) {
         $r = $s->get('gestao/index.php?m=agenda&a=listar');
         ok($r['status'] === 200 && str_contains($r['html'], 'Agenda') && semErrosPhp($r['html']), "$quem: agenda/listar 200", $r);
+        ok(stripos(ltrim($r['html']), '<!DOCTYPE html>') === 0, "$quem: página da gestão começa com <!DOCTYPE html>", $r);
         $r = $s->get('gestao/index.php?m=perfil&a=editar');
         ok($r['status'] === 200 && str_contains($r['html'], 'O Meu Perfil') && semErrosPhp($r['html']), "$quem: perfil/editar 200", $r);
     }
@@ -134,6 +135,8 @@ function teste_agenda_perfil(): void {
     $f = new Sessao($BASE); $f->login(TESTE_BARBEIRO);
     $r = $f->get('gestao/index.php?m=agenda&a=listar');
     ok($r['status'] === 302 && str_contains($r['local'], 'm=perfil') && str_contains($r['local'], 'force=1'), 'com password por alterar, agenda → perfil', $r);
+    $r = $f->get('gestao/index.php?m=perfil&a=xyz');
+    ok($r['status'] === 302 && str_contains($r['local'], 'm=perfil') && str_contains($r['local'], 'force=1'), 'com password por alterar, perfil/ação inválida → perfil (não o dashboard)', $r);
     $r = $f->get('gestao/index.php?m=perfil&a=editar&force=1');
     ok($r['status'] === 200 && str_contains($r['html'], 'Obrigatório'), 'perfil mostra a alteração obrigatória', $r);
     $r = $f->post('gestao/index.php?m=perfil&a=alterar_password', [
@@ -297,8 +300,9 @@ function teste_publico(): void {
     ok($r['status'] === 302 && str_contains($r['local'], 'm=marcar') && str_contains($r['local'], 'servico=5'), 'publico/marcar.php antigo redireciona', $r);
     $r = $s->get('publico/verificar.php');
     ok($r['status'] === 302 && str_contains($r['local'], 'm=verificar'), 'publico/verificar.php antigo redireciona', $r);
-    $r = $s->post('index.php?m=marcar&slug=rlbarber', ['servico' => 5]);
-    ok($r['status'] === 302 && !str_contains($r['local'], 'm=verificar'), 'POST público sem CSRF é recusado', $r);
+    $r = $s->post('index.php?m=marcar&slug=rlbarber', ['servico' => 5, 'nome' => 'Cliente Sem Token']);
+    ok(!str_contains($r['local'] ?? '', 'm=verificar'), 'POST público sem CSRF é recusado', $r);
+    ok($r['status'] === 200 && str_contains($r['html'], 'A sessão expirou'), 'marcar sem CSRF mostra "A sessão expirou" (não redireciona)', $r);
 }
 
 /* ===================== Execução ===================== */

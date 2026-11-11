@@ -2,6 +2,7 @@
 // Estrutura da gestão: <head> e abertura do <body> (incluído por gestao/index.php)
 if (count(get_included_files()) === 1) { header('Location: ../index.php'); exit; }
 ?>
+<!DOCTYPE html>
 <html lang="pt">
 <head>
     <meta charset="UTF-8">

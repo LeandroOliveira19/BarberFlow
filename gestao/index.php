@@ -63,15 +63,16 @@ $MODULOS = [
 $modulo = lerParametro('m', 'dashboard');
 $acao   = lerParametro('a', $MODULOS[$perfil][$modulo][0] ?? 'ver');
 
-// Enquanto tiver de alterar a password, só o perfil está disponível (o logout é um ficheiro à parte)
-if (($_SESSION['precisa_alterar_password'] ?? 0) == 1 && $modulo !== 'perfil') {
-    redirecionar(urlModulo('perfil', 'editar', ['force' => 1]));
-}
-
 if (!validarModulo($modulo, $acao, $MODULOS[$perfil]) || !is_file(__DIR__ . "/mod/$modulo/$acao.php")) {
     if (isset($_GET['m'])) flash('erro', 'Página não encontrada.');
     $modulo = 'dashboard';
     $acao   = 'ver';
+}
+
+// Enquanto tiver de alterar a password, só o perfil está disponível (o logout é um ficheiro à parte).
+// Corre depois da validação acima, para que uma ação inválida (?m=perfil&a=xyz) não abra o dashboard.
+if (($_SESSION['precisa_alterar_password'] ?? 0) == 1 && $modulo !== 'perfil') {
+    redirecionar(urlModulo('perfil', 'editar', ['force' => 1]));
 }
 
 /* ---------- 3. CSRF em todos os pedidos POST ---------- */

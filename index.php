@@ -53,7 +53,10 @@ if (!validarModulo($modulo, $acao, $MODULOS) || !is_file(__DIR__ . "/mod/$modulo
 }
 
 /* ---------- 3. CSRF em todos os pedidos POST ---------- */
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && !csrfValido()) {
+// Os formulários do cliente (marcar, verificar) não perdem o que foi escrito: em vez de
+// redirecionar, o módulo recebe $csrfValido = false, não grava nada e mostra "A sessão expirou".
+$csrfValido = $_SERVER['REQUEST_METHOD'] !== 'POST' || csrfValido();
+if (!$csrfValido && !in_array($modulo, ['marcar', 'verificar'], true)) {
     redirecionar(urlModulo($modulo, $MODULOS[$modulo][0], ['slug' => $barbearia['slug']]));
 }
 
