@@ -70,6 +70,12 @@ function cfg(string $key, string $default = ''): string {
                         <input type="time" name="hora_fecho" value="<?= cfg('hora_fecho', '19:00') ?>">
                     </div>
                 </div>
+                <div class="input-group">
+                    <label>Cancelar/remarcar na app até (horas antes)</label>
+                    <input type="number" name="antecedencia_alteracao_horas" min="0" max="168" step="1" required
+                           value="<?= cfg('antecedencia_alteracao_horas', '24') ?>">
+                    <small style="color: var(--muted);">Depois deste prazo o cliente tem de contactar a barbearia. 0 = até à hora da marcação.</small>
+                </div>
             </div>
 
             <!-- Coluna 2: Design e Layout -->
