@@ -79,12 +79,26 @@ function validarDadosMarcacao(PDO $pdo, int $bid, array $d): array {
     if (VERIFICAR_MARCACOES && !filter_var($email, FILTER_VALIDATE_EMAIL)) throw $invalido('Indica um email válido: enviamos-te aí o código de confirmação.');
     if ($email !== '' && (!filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 150)) throw $invalido('O email indicado não é válido.');
     if (mb_strlen($notas) > 300)                                       throw $invalido('As notas podem ter no máximo 300 caracteres.');
+    if (isset($d['para_nome']) && !is_string($d['para_nome']))         throw $invalido('Indica o nome da pessoa (2 a 120 caracteres).');
+    $paraNome = normalizarParaNome((string)($d['para_nome'] ?? ''), $nome);
+    if ($paraNome !== null && (mb_strlen($paraNome) < 2 || mb_strlen($paraNome) > 120)) {
+        throw $invalido('Indica o nome da pessoa (2 a 120 caracteres).');
+    }
 
     [$h, $mi] = array_map('intval', explode(':', $hora));
     $inicio = (clone $dia)->setTime($h, $mi);
     $fim    = (clone $inicio)->modify('+' . (int)$servico['duracao_minutos'] . ' minutes');
 
-    return compact('servico', 'barbeiro', 'dia', 'hora', 'inicio', 'fim', 'nome', 'email', 'notas') + ['telemovel' => $tel];
+    return compact('servico', 'barbeiro', 'dia', 'hora', 'inicio', 'fim', 'nome', 'email', 'notas') + ['telemovel' => $tel, 'para_nome' => $paraNome];
+}
+
+/**
+ * "Para quem é a marcação": espaços normalizados; vazio ou igual ao nome de quem marca → null (é para o próprio).
+ */
+function normalizarParaNome(string $paraNome, string $nomeCliente): ?string {
+    $p = trim((string)preg_replace('/\s+/u', ' ', $paraNome));
+    if ($p === '' || mb_strtolower($p) === mb_strtolower(trim($nomeCliente))) return null;
+    return $p;
 }
 
 /**
@@ -120,40 +134,48 @@ function criarMarcacao(PDO $pdo, array $barbearia, array $dados): array {
         $st->execute([$bid, $v['nome'], $v['telemovel'], $v['email'] !== '' ? $v['email'] : null]);
         $clienteId = (int)$pdo->lastInsertId();
 
-        // Regra definida pelo grupo: no máximo uma marcação ativa por cliente e por dia.
+        // As regras contam por PESSOA: o cliente (telemóvel) + para quem é a marcação ('' = o próprio).
+        // A collation da BD (utf8mb4_unicode_ci) já ignora maiúsculas e espaços finais: "Tiago" = "tiago ".
+        $pessoa = $v['para_nome'] ?? '';
+
+        // Regra definida pelo grupo: no máximo uma marcação ativa por pessoa e por dia.
         // Contam as confirmadas/concluídas e as pendentes cujo código ainda não expirou.
         $diaIni = (clone $v['dia'])->setTime(0, 0);
         $diaFim = (clone $diaIni)->modify('+1 day');
         $st = $pdo->prepare(
             "SELECT COUNT(*) FROM marcacoes
-             WHERE barbearia_id = ? AND cliente_id = ? AND inicio >= ? AND inicio < ?
+             WHERE barbearia_id = ? AND cliente_id = ? AND COALESCE(para_nome, '') = ? AND inicio >= ? AND inicio < ?
                AND (estado IN ('confirmada','concluida')
                     OR (estado = 'pendente_verificacao' AND (codigo_expira_em IS NULL OR codigo_expira_em > ?)))"
         );
-        $st->execute([$bid, $clienteId, $diaIni->format('Y-m-d H:i:s'), $diaFim->format('Y-m-d H:i:s'), $agora]);
+        $st->execute([$bid, $clienteId, $pessoa, $diaIni->format('Y-m-d H:i:s'), $diaFim->format('Y-m-d H:i:s'), $agora]);
         if ((int)$st->fetchColumn() > 0) {
-            throw new ReservaErro(409, 'marcacao_no_dia', 'Já tens uma marcação para este dia. Escolhe outro dia ou contacta a barbearia.');
+            throw new ReservaErro(409, 'marcacao_no_dia', $pessoa === ''
+                ? 'Já tens uma marcação para este dia. Escolhe outro dia ou contacta a barbearia.'
+                : "Já existe uma marcação para {$pessoa} neste dia. Escolhe outro dia ou contacta a barbearia.");
         }
 
+        // Limite anti-abuso (MAX_MARCACOES_ATIVAS_CLIENTE), também por pessoa
         $st = $pdo->prepare(
             "SELECT COUNT(*) FROM marcacoes
-             WHERE barbearia_id = ? AND cliente_id = ? AND inicio > ?
+             WHERE barbearia_id = ? AND cliente_id = ? AND COALESCE(para_nome, '') = ? AND inicio > ?
                AND (estado = 'confirmada' OR (estado = 'pendente_verificacao' AND (codigo_expira_em IS NULL OR codigo_expira_em > ?)))"
         );
-        $st->execute([$bid, $clienteId, $agora, $agora]);
+        $st->execute([$bid, $clienteId, $pessoa, $agora, $agora]);
         if ((int)$st->fetchColumn() >= MAX_MARCACOES_ATIVAS_CLIENTE) {
             throw new ReservaErro(409, 'limite_marcacoes', 'Já tens várias marcações ativas. Aguarda ou contacta a barbearia para alterar.');
         }
 
         $st = $pdo->prepare(
-            "INSERT INTO marcacoes (barbearia_id, cliente_id, barbeiro_id, servico_id, inicio, fim, estado, notas, canal_verificacao, codigo_expira_em, verificado_em)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+            "INSERT INTO marcacoes (barbearia_id, cliente_id, barbeiro_id, servico_id, inicio, fim, estado, notas, para_nome, canal_verificacao, codigo_expira_em, verificado_em)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         );
         $st->execute([
             $bid, $clienteId, (int)$v['barbeiro']['id'], (int)$v['servico']['id'],
             $v['inicio']->format('Y-m-d H:i:s'), $v['fim']->format('Y-m-d H:i:s'),
             $verificar ? 'pendente_verificacao' : 'confirmada',
             $v['notas'] !== '' ? $v['notas'] : null,
+            $v['para_nome'],
             $verificar ? 'email' : null,
             $expira,
             $verificar ? null : $agora,
@@ -194,7 +216,7 @@ function carregarMarcacaoPorId(PDO $pdo, int $id): ?array {
     $st = $pdo->prepare(
         "SELECT m.id, m.barbearia_id, b.nome AS barbearia_nome, b.slug AS barbearia_slug, m.cliente_id, c.email,
                 m.estado, m.inicio, m.fim, m.codigo_expira_em, m.tentativas_validacao,
-                s.nome AS servico_nome, u.nome AS barbeiro_nome
+                s.nome AS servico_nome, u.nome AS barbeiro_nome, m.para_nome
          FROM marcacoes m
          JOIN barbearias   b ON b.id = m.barbearia_id AND b.ativa = 1
          JOIN clientes     c ON c.id = m.cliente_id  AND c.barbearia_id = m.barbearia_id

@@ -222,6 +222,14 @@ function teste_criar_marcacao(): void {
     $r = novaMarcacao($horas[1], $GLOBALS['tel_outro']);
     verifica($r['status'] === 201, 'outro cliente no mesmo dia continua a poder marcar', $r);
 
+    // Marcar para outra pessoa (ex.: o pai marca para o filho): a regra do dia é por pessoa
+    $rTiago = novaMarcacao($horas[2], $tel00, EMAIL_TESTE, ['para_nome' => 'Tiago']);
+    verifica($rTiago['status'] === 201, 'mesmo telemóvel, mesmo dia, para outra pessoa 201', $rTiago);
+    $r = novaMarcacao($horas[3], $GLOBALS['tel_digitos'], EMAIL_TESTE, ['para_nome' => '  tiago ']);
+    verifica($r['status'] === 409 && ($r['json']['erro']['codigo'] ?? '') === 'marcacao_no_dia', 'mesma pessoa (Tiago/tiago) no mesmo dia 409', $r);
+    $r = novaMarcacao($horas[3], $GLOBALS['tel_digitos'], EMAIL_TESTE, ['para_nome' => str_repeat('x', 121)]);
+    verifica($r['status'] === 422 && ($r['json']['erro']['codigo'] ?? '') === 'dados_invalidos', 'para_nome com mais de 120 caracteres 422', $r);
+
     // Limite de marcações ativas (MAX_MARCACOES_ATIVAS_CLIENTE = 3), agora em dias diferentes
     $dias = outrosDiasComSlot(3);
     verifica(count($dias) === 3, 'há 3 outros dias com horários livres');
@@ -233,6 +241,9 @@ function teste_criar_marcacao(): void {
     guardarPendente($r3);
     $r4 = novaMarcacao($dias[2][1], '+351' . $GLOBALS['tel_digitos'], EMAIL_TESTE, ['data' => $dias[2][0]]);
     verifica($r4['status'] === 409 && ($r4['json']['erro']['codigo'] ?? '') === 'limite_marcacoes', '4.ª marcação ativa 409 limite_marcacoes', $r4);
+    // O limite é por pessoa: o Tiago (mesmo telemóvel) ainda pode marcar nesse dia
+    $r5 = novaMarcacao($dias[2][1], $GLOBALS['tel_digitos'], EMAIL_TESTE, ['data' => $dias[2][0], 'para_nome' => 'Tiago']);
+    verifica($r5['status'] === 201, 'limite de 3 é por pessoa (Tiago ainda marca) 201', $r5);
     $GLOBALS['marcacoes_extra'] = [(int)($r2['json']['marcacao_id'] ?? 0), (int)($r3['json']['marcacao_id'] ?? 0)];
 }
 
@@ -321,6 +332,7 @@ function teste_listar(): void {
     verifica(($m['barbearia_slug'] ?? '') === 'rlbarber' && is_string($m['servico_nome'] ?? null) && is_string($m['barbeiro_nome'] ?? null), 'resumo da marcação', $r);
     verifica(preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', (string)($m['inicio'] ?? '')) === 1, 'inicio formatado', $r);
     verifica(!array_key_exists('email', $m) && !array_key_exists('cliente_id', $m), 'sem dados do cliente', $r);
+    verifica(array_key_exists('para_nome', $m) && $m['para_nome'] === null, 'lista inclui para_nome (null = para quem marcou)', $r);
 
     // Review Focus 4: token adulterado ou usado com outro id não revela nada
     $adulterado = substr($tok, 0, -1) . ($tok[-1] === 'a' ? 'b' : 'a');

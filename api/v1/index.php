@@ -191,6 +191,7 @@ function h_listar_marcacoes(PDO $pdo, array $p): never {
             'inicio'         => $m['inicio'],
             'fim'            => $m['fim'],
             'servico_nome'   => $m['servico_nome'],
+            'para_nome'      => $m['para_nome'],
             'barbeiro_nome'  => $m['barbeiro_nome'],
             'barbearia_slug' => $m['barbearia_slug'],
             'barbearia_nome' => $m['barbearia_nome'],

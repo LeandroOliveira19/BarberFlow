@@ -99,7 +99,7 @@ if ($vista === 'dia') {
 
 $sql = "
     SELECT m.id, m.inicio, m.fim, m.estado,
-           c.nome AS cliente_nome, c.telemovel AS cliente_telemovel, c.email AS cliente_email, m.notas,
+           c.nome AS cliente_nome, c.telemovel AS cliente_telemovel, c.email AS cliente_email, m.notas, m.para_nome,
            s.nome AS servico_nome, s.preco AS servico_preco,
            u.nome AS barbeiro_nome
     FROM marcacoes m
@@ -268,7 +268,12 @@ $slug = (string)$sl->fetchColumn();
             <div class="marcacao <?= e($m['estado']) ?>">
                 <div class="hora"><?= $ini->format('H:i') ?><small>até <?= $fim->format('H:i') ?></small></div>
                 <div class="cliente">
-                    <strong><?= e($m['cliente_nome']) ?></strong>
+                    <?php if (!empty($m['para_nome'])): ?>
+                        <strong><?= e($m['para_nome']) ?></strong>
+                        <span class="notas">marcado por <?= e($m['cliente_nome']) ?></span>
+                    <?php else: ?>
+                        <strong><?= e($m['cliente_nome']) ?></strong>
+                    <?php endif; ?>
                     <span>
                         <?= e($m['servico_nome']) ?> · <?= number_format((float)$m['servico_preco'], 2, ',', '') ?> €
                         <?php if ($eGestor): ?> · com <?= e($m['barbeiro_nome']) ?><?php endif; ?>

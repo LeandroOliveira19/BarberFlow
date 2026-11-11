@@ -22,13 +22,13 @@ function http(string $url, ?array $post = null): string {
 }
 
 /** Abre o passo 2 do formulário (para obter o CSRF) e submete uma marcação. */
-function marcarNoSite(int $sv, int $bb, string $data, string $hora, string $tel): array {
+function marcarNoSite(int $sv, int $bb, string $data, string $hora, string $tel, string $paraNome = ''): array {
     global $BASE;
     $pagina = http("$BASE/publico/marcar.php?slug=rlbarber&servico=$sv&barbeiro=$bb&data=$data");
     preg_match('/name="csrf" value="([0-9a-f]+)"/', $pagina, $m);
     $html = http("$BASE/publico/marcar.php?slug=rlbarber", [
         'csrf' => $m[1] ?? '', 'slug' => 'rlbarber', 'servico' => $sv, 'barbeiro' => $bb, 'data' => $data, 'hora' => $hora,
-        'nome' => 'Teste Site', 'telemovel' => $tel, 'email' => 'site@example.com',
+        'nome' => 'Teste Site', 'telemovel' => $tel, 'email' => 'site@example.com', 'para_nome' => $paraNome,
     ]);
     return [$GLOBALS['ULTIMO_STATUS'], $html];
 }
@@ -54,8 +54,19 @@ try {
     @unlink($jar); $jar = tempnam(sys_get_temp_dir(), 'cj');   // sessão nova, como outro separador
     [$st2, $html2] = marcarNoSite($sv, $bb, (string)$data, $horas[1], $tel);
     $ok($st2 === 200 && str_contains($html2, 'Já tens uma marcação para este dia'), '2.ª marcação no mesmo dia é recusada com a mensagem');
+
+    // O pai marca para o filho no mesmo dia, com o mesmo telemóvel → aceite e guardado em para_nome
+    @unlink($jar); $jar = tempnam(sys_get_temp_dir(), 'cj');
+    [$st3] = marcarNoSite($sv, $bb, (string)$data, $horas[1], $tel, 'Tiago');
+    $ok($st3 === 302, 'marcação para outra pessoa no mesmo dia é aceite');
+    require_once __DIR__ . '/../../../config/db.php';
+    $q = $pdo->prepare("SELECT COUNT(*) FROM marcacoes m JOIN clientes c ON c.id = m.cliente_id WHERE c.telemovel = ? AND m.para_nome = 'Tiago'");
+    $q->execute([$tel]);
+    $ok((int)$q->fetchColumn() === 1, 'para_nome guardado na marcação');
+    $pagina = http("$BASE/publico/marcar.php?slug=rlbarber&servico=$sv&barbeiro=$bb&data=$data");
+    $ok(str_contains($pagina, 'name="para_nome"'), 'formulário tem o campo "Para quem é a marcação?"');
 } finally {
-    require __DIR__ . '/../../../config/db.php';
+    require_once __DIR__ . '/../../../config/db.php';
     $pdo->prepare("DELETE v FROM verificacoes v JOIN marcacoes m ON m.id = v.marcacao_id JOIN clientes c ON c.id = m.cliente_id WHERE c.barbearia_id = 1 AND c.telemovel = ?")->execute([$tel]);
     $pdo->prepare("DELETE m FROM marcacoes m JOIN clientes c ON c.id = m.cliente_id WHERE c.barbearia_id = 1 AND c.telemovel = ?")->execute([$tel]);
     $pdo->prepare("DELETE FROM clientes WHERE barbearia_id = 1 AND telemovel = ?")->execute([$tel]);

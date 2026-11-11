@@ -2,6 +2,7 @@
 declare(strict_types=1);
 require __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/marcacoes.php';
+require_once __DIR__ . '/../config/reservas.php'; // normalizarParaNome()
 session_start();
 
 /* ---------- Barbearia (pelo slug) ---------- */
@@ -72,6 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         [$sv, $bb, $dia, $erroEscolha] = validarEscolha($servicosPorId, $barbeirosPorId, $diasAbertos, $_POST['servico'] ?? 0, $_POST['barbeiro'] ?? 0, $_POST['data'] ?? '');
         $hora    = (string)($_POST['hora'] ?? '');
         $nomeCli = trim((string)($_POST['nome'] ?? ''));
+        $paraNome = normalizarParaNome((string)($_POST['para_nome'] ?? ''), $nomeCli); // null = para o próprio
         $email   = trim((string)($_POST['email'] ?? ''));
         $notas   = trim((string)($_POST['notas'] ?? ''));
 
@@ -84,6 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         elseif ($erroEscolha)                                     $erro = $erroEscolha;
         elseif (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $hora)) $erro = 'Escolhe um horário.';
         elseif (mb_strlen($nomeCli) < 2 || mb_strlen($nomeCli) > 120) $erro = 'Indica o teu nome (2 a 120 caracteres).';
+        elseif ($paraNome !== null && (mb_strlen($paraNome) < 2 || mb_strlen($paraNome) > 120)) $erro = 'Indica o nome da pessoa (2 a 120 caracteres).';
         elseif (!preg_match('/^[239]\d{8}$/', $telDigitos))       $erro = 'Indica um telemóvel português válido (9 dígitos).';
         elseif (VERIFICAR_MARCACOES && !filter_var($email, FILTER_VALIDATE_EMAIL)) $erro = 'Indica um email válido: enviamos-te aí o código de confirmação.';
         elseif ($email !== '' && (!filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 150)) $erro = 'O email indicado não é válido.';
@@ -119,20 +122,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $diaFim = (clone $diaIni)->modify('+1 day');
                 $st = $pdo->prepare(
                     "SELECT COUNT(*) FROM marcacoes
-                     WHERE barbearia_id = ? AND cliente_id = ? AND inicio >= ? AND inicio < ?
+                     WHERE barbearia_id = ? AND cliente_id = ? AND COALESCE(para_nome, '') = ? AND inicio >= ? AND inicio < ?
                        AND (estado IN ('confirmada','concluida')
                             OR (estado = 'pendente_verificacao' AND (codigo_expira_em IS NULL OR codigo_expira_em > ?)))"
                 );
-                $st->execute([$bid, $clienteId, $diaIni->format('Y-m-d H:i:s'), $diaFim->format('Y-m-d H:i:s'), $agora]);
+                $st->execute([$bid, $clienteId, $paraNome ?? '', $diaIni->format('Y-m-d H:i:s'), $diaFim->format('Y-m-d H:i:s'), $agora]);
                 if ((int)$st->fetchColumn() > 0) throw new RuntimeException('dia');
 
                 // Limite anti-abuso
                 $st = $pdo->prepare(
                     "SELECT COUNT(*) FROM marcacoes
-                     WHERE barbearia_id = ? AND cliente_id = ? AND inicio > ?
+                     WHERE barbearia_id = ? AND cliente_id = ? AND COALESCE(para_nome, '') = ? AND inicio > ?
                        AND (estado = 'confirmada' OR (estado = 'pendente_verificacao' AND (codigo_expira_em IS NULL OR codigo_expira_em > ?)))"
                 );
-                $st->execute([$bid, $clienteId, $agora, $agora]);
+                $st->execute([$bid, $clienteId, $paraNome ?? '', $agora, $agora]);
                 if ((int)$st->fetchColumn() >= MAX_MARCACOES_ATIVAS_CLIENTE) throw new RuntimeException('limite');
 
                 [$h, $mi] = array_map('intval', explode(':', $hora));
@@ -141,14 +144,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $expira = $verificar ? (new DateTime())->modify('+' . CODIGO_VALIDADE_MIN . ' minutes')->format('Y-m-d H:i:s') : null;
 
                 $st = $pdo->prepare(
-                    "INSERT INTO marcacoes (barbearia_id, cliente_id, barbeiro_id, servico_id, inicio, fim, estado, notas, canal_verificacao, codigo_expira_em, verificado_em)
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                    "INSERT INTO marcacoes (barbearia_id, cliente_id, barbeiro_id, servico_id, inicio, fim, estado, notas, para_nome, canal_verificacao, codigo_expira_em, verificado_em)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
                 );
                 $st->execute([
                     $bid, $clienteId, (int)$bb['id'], (int)$sv['id'],
                     $inicio->format('Y-m-d H:i:s'), $fim->format('Y-m-d H:i:s'),
                     $verificar ? 'pendente_verificacao' : 'confirmada',
                     $notas !== '' ? $notas : null,
+                    $paraNome,
                     $verificar ? 'email' : null,
                     $expira,
                     $verificar ? null : $agora,
@@ -166,7 +170,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($pdo->inTransaction()) $pdo->rollBack();
                 $erro = match ($ex->getMessage()) {
                     'limite' => 'Já tens várias marcações ativas. Aguarda ou contacta a barbearia para alterar.',
-                    'dia'    => 'Já tens uma marcação para este dia. Escolhe outro dia ou contacta a barbearia.',
+                    'dia'    => $paraNome === null
+                        ? 'Já tens uma marcação para este dia. Escolhe outro dia ou contacta a barbearia.'
+                        : "Já existe uma marcação para {$paraNome} neste dia. Escolhe outro dia ou contacta a barbearia.",
                     default  => 'Esse horário acabou de ser ocupado. Escolhe outro, por favor.',
                 };
             } catch (Throwable $ex) {
@@ -373,6 +379,9 @@ $linkSite = 'index.php?slug=' . rawurlencode($barbearia['slug']);
                 <h2 style="margin-top:1.8rem"><span>3.</span>Os teus dados</h2>
                 <label class="campo">Nome
                     <input type="text" name="nome" required maxlength="120" autocomplete="name" value="<?= e($_POST['nome'] ?? '') ?>">
+                </label>
+                <label class="campo">Para quem é a marcação? (opcional, se não for para ti)
+                    <input type="text" name="para_nome" maxlength="120" placeholder="Ex.: Tiago (filho)" value="<?= e($_POST['para_nome'] ?? '') ?>">
                 </label>
                 <label class="campo">Telemóvel
                     <input type="tel" name="telemovel" required inputmode="tel" autocomplete="tel" placeholder="912 345 678" value="<?= e($_POST['telemovel'] ?? '') ?>">
