@@ -112,6 +112,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 );
                 $st->execute([$bid, $nomeCli, $telDigitos, $email !== '' ? $email : null]);
                 $clienteId = (int)$pdo->lastInsertId();
+                $agora = agoraSql();
+
+                // No máximo uma marcação ativa por cliente e por dia (mesma regra da API, config/reservas.php)
+                $diaIni = (clone $dia)->setTime(0, 0);
+                $diaFim = (clone $diaIni)->modify('+1 day');
+                $st = $pdo->prepare(
+                    "SELECT COUNT(*) FROM marcacoes
+                     WHERE barbearia_id = ? AND cliente_id = ? AND inicio >= ? AND inicio < ?
+                       AND (estado IN ('confirmada','concluida')
+                            OR (estado = 'pendente_verificacao' AND (codigo_expira_em IS NULL OR codigo_expira_em > ?)))"
+                );
+                $st->execute([$bid, $clienteId, $diaIni->format('Y-m-d H:i:s'), $diaFim->format('Y-m-d H:i:s'), $agora]);
+                if ((int)$st->fetchColumn() > 0) throw new RuntimeException('dia');
 
                 // Limite anti-abuso
                 $st = $pdo->prepare(
@@ -119,7 +132,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                      WHERE barbearia_id = ? AND cliente_id = ? AND inicio > ?
                        AND (estado = 'confirmada' OR (estado = 'pendente_verificacao' AND (codigo_expira_em IS NULL OR codigo_expira_em > ?)))"
                 );
-                $agora = agoraSql();
                 $st->execute([$bid, $clienteId, $agora, $agora]);
                 if ((int)$st->fetchColumn() >= MAX_MARCACOES_ATIVAS_CLIENTE) throw new RuntimeException('limite');
 
@@ -152,9 +164,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $pdo->commit();
             } catch (RuntimeException $ex) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
-                $erro = $ex->getMessage() === 'limite'
-                    ? 'Já tens várias marcações ativas. Aguarda ou contacta a barbearia para alterar.'
-                    : 'Esse horário acabou de ser ocupado. Escolhe outro, por favor.';
+                $erro = match ($ex->getMessage()) {
+                    'limite' => 'Já tens várias marcações ativas. Aguarda ou contacta a barbearia para alterar.',
+                    'dia'    => 'Já tens uma marcação para este dia. Escolhe outro dia ou contacta a barbearia.',
+                    default  => 'Esse horário acabou de ser ocupado. Escolhe outro, por favor.',
+                };
             } catch (Throwable $ex) {
                 if ($pdo->inTransaction()) $pdo->rollBack();
                 error_log('[BarberFlow] Erro ao criar marcação: ' . $ex->getMessage());
