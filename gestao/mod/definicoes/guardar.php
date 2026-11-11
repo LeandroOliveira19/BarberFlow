@@ -12,7 +12,10 @@ $nova_pass_info = '';
     $nome = trim($_POST['nome'] ?? '');
     $morada = trim($_POST['morada'] ?? '');
     
-    if ($nome && $morada) {
+    $antecedencia = trim((string)($_POST['antecedencia_alteracao_horas'] ?? '24'));
+    if (!ctype_digit($antecedencia) || (int)$antecedencia > 168) {
+        $erro = 'A antecedência tem de ser um número de horas entre 0 e 168.';
+    } elseif ($nome && $morada) {
         $definicoes = new Configuracao($pdo, $bid);   // objects/Configuracao.php
         $definicoes->atualizarBarbearia($nome, $morada);
 
@@ -30,7 +33,8 @@ $nova_pass_info = '';
             'link_facebook' => $_POST['link_facebook'] ?? '',
             'galeria_img_1' => $_POST['galeria_img_1'] ?? '',
             'galeria_img_2' => $_POST['galeria_img_2'] ?? '',
-            'galeria_img_3' => $_POST['galeria_img_3'] ?? ''
+            'galeria_img_3' => $_POST['galeria_img_3'] ?? '',
+            'antecedencia_alteracao_horas' => (string)(int)$antecedencia,
         ];
 
         $definicoes->save($configs);

@@ -207,6 +207,44 @@ function teste_modulos_gestor(): void {
     $r = $g->post('gestao/index.php?m=fornecedores&a=guardar', ['nome' => 'Fornecedor Rotas', 'csrf' => $csrf]);
     $n = (int)$pdo->query("SELECT COUNT(*) FROM fornecedores WHERE barbearia_id = 1 AND nome = 'Fornecedor Rotas'")->fetchColumn();
     ok($n === 1 && $r['status'] === 302, 'gestor cria fornecedor', $r);
+
+    teste_definicoes_antecedencia($g);
+}
+
+/** Definições: campo da antecedência para cancelar/remarcar na app. */
+function antecedenciaNaBd(PDO $pdo): ?string {
+    $v = $pdo->query("SELECT valor FROM configuracoes WHERE barbearia_id = 1 AND chave = 'antecedencia_alteracao_horas'")->fetchColumn();
+    return $v === false ? null : (string)$v;
+}
+
+function teste_definicoes_antecedencia(Sessao $g): void {
+    global $pdo;
+    $antes = antecedenciaNaBd($pdo);
+    $r = $g->get('gestao/index.php?m=definicoes&a=editar');
+    ok(str_contains($r['html'], 'name="antecedencia_alteracao_horas"') && str_contains($r['html'], 'Cancelar/remarcar na app até'),
+       'Definições mostra o campo da antecedência', $r);
+
+    // O guardar grava todos os campos: envia os valores atuais para não mexer no resto da configuração
+    $cfg  = $pdo->query("SELECT chave, valor FROM configuracoes WHERE barbearia_id = 1")->fetchAll(PDO::FETCH_KEY_PAIR);
+    $barb = $pdo->query("SELECT nome, morada FROM barbearias WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+    $form = ['nome' => $barb['nome'], 'morada' => $barb['morada'], 'csrf' => Sessao::csrf($r['html'])];
+    foreach (['slogan', 'sobre', 'hora_abertura', 'hora_fecho', 'tema_cor', 'tema_fundo', 'tema_layout', 'tema_hero', 'tema_fonte',
+              'link_instagram', 'link_facebook', 'galeria_img_1', 'galeria_img_2', 'galeria_img_3'] as $k) {
+        if (isset($cfg[$k])) $form[$k] = $cfg[$k];
+    }
+    try {
+        $r = $g->post('gestao/index.php?m=definicoes&a=guardar', $form + ['antecedencia_alteracao_horas' => '12']);
+        ok($r['status'] === 302 && antecedenciaNaBd($pdo) === '12', 'guardar grava a antecedência (12)', $r);
+        $r = $g->post('gestao/index.php?m=definicoes&a=guardar', $form + ['antecedencia_alteracao_horas' => '200']);
+        $r = $g->get('gestao/index.php?m=definicoes&a=editar');
+        ok(antecedenciaNaBd($pdo) === '12' && str_contains($r['html'], 'entre 0 e 168'), 'antecedência 200 é recusada com mensagem', $r);
+        ok(str_contains($r['html'], 'name="antecedencia_alteracao_horas"') && str_contains($r['html'], 'value="12"'), 'campo mostra o valor gravado', $r);
+    } finally {
+        $pdo->prepare("DELETE FROM configuracoes WHERE barbearia_id = 1 AND chave = 'antecedencia_alteracao_horas'")->execute();
+        if ($antes !== null) {
+            $pdo->prepare("INSERT INTO configuracoes (barbearia_id, chave, valor) VALUES (1, 'antecedencia_alteracao_horas', ?)")->execute([$antes]);
+        }
+    }
 }
 
 /* ===================== Task 5: stock e pedidos ===================== */
