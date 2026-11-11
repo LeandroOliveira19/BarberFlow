@@ -168,6 +168,16 @@ function novaMarcacao(string $hora, string $telemovel, ?string $email = EMAIL_TE
     ]);
 }
 
+function guardarPendente(array $r): void {
+    $id = (int)($r['json']['marcacao_id'] ?? 0);
+    if ($id) $GLOBALS['pend'][$id] = (string)($r['json']['token_pendente'] ?? '');
+}
+
+/** POST marcacoes/{id}/{acao} com o token_pendente devolvido na criação. */
+function acao(int $id, string $acao, array $corpo = []): array {
+    return pedido('POST', "marcacoes/$id/$acao", $corpo + ['token_pendente' => $GLOBALS['pend'][$id] ?? '']);
+}
+
 function teste_criar_marcacao(): void {
     if (empty($GLOBALS['slot_teste'])) { verifica(false, 'slot_teste disponível (Task 3)'); return; }
     $sufixo = (string)random_int(10, 99);
@@ -184,6 +194,8 @@ function teste_criar_marcacao(): void {
     verifica(preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', (string)($r['json']['codigo_expira_em'] ?? '')) === 1, 'codigo_expira_em formatado', $r);
     verifica(strlen((string)($r['json']['codigo_dev'] ?? '')) === 6, 'codigo_dev em modo dev', $r);
     $GLOBALS['marcacao'] = ['id' => (int)($r['json']['marcacao_id'] ?? 0), 'codigo' => (string)($r['json']['codigo_dev'] ?? '')];
+    verifica(preg_match('/^[0-9a-f]{64}$/', (string)($r['json']['token_pendente'] ?? '')) === 1, 'token_pendente devolvido', $r);
+    guardarPendente($r);
 
     // Review Focus 1: o mesmo slot não pode ser reservado duas vezes
     $r = novaMarcacao($horas[0], $GLOBALS['tel_outro']);
@@ -208,6 +220,8 @@ function teste_criar_marcacao(): void {
     $r2 = novaMarcacao($horas[1], $tel00);
     $r3 = novaMarcacao($horas[2], $GLOBALS['tel_digitos']);
     verifica($r2['status'] === 201 && $r3['status'] === 201, '2.ª e 3.ª marcações do mesmo cliente 201', $r3);
+    guardarPendente($r2);
+    guardarPendente($r3);
     $r4 = novaMarcacao($horas[3], '+351' . $GLOBALS['tel_digitos']);
     verifica($r4['status'] === 409 && ($r4['json']['erro']['codigo'] ?? '') === 'limite_marcacoes', '4.ª marcação ativa 409 limite_marcacoes', $r4);
     $GLOBALS['marcacoes_extra'] = [(int)($r2['json']['marcacao_id'] ?? 0), (int)($r3['json']['marcacao_id'] ?? 0)];
@@ -220,42 +234,53 @@ function teste_verificar(): void {
     $rota = "marcacoes/{$m['id']}/verificar";
     $errado = $m['codigo'] === '000000' ? '111111' : '000000';
 
+    // Revisão final #1: sem o token_pendente ninguém pode gastar tentativas nem reenviar
     $r = pedido('POST', $rota, ['codigo' => $errado]);
+    verifica($r['status'] === 403 && ($r['json']['erro']['codigo'] ?? '') === 'token_invalido', 'verificar sem token_pendente 403', $r);
+    $r = pedido('POST', $rota, ['codigo' => $errado, 'token_pendente' => str_repeat('a', 64)]);
+    verifica($r['status'] === 403, 'verificar com token_pendente errado 403', $r);
+    $r = pedido('POST', "marcacoes/{$m['id']}/reenviar", ['token_pendente' => str_repeat('b', 64)]);
+    verifica($r['status'] === 403, 'reenviar com token_pendente errado 403', $r);
+    $outro = (int)($GLOBALS['marcacoes_extra'][0] ?? 0);
+    $r = pedido('POST', "marcacoes/$outro/verificar", ['codigo' => $errado, 'token_pendente' => $GLOBALS['pend'][$m['id']] ?? '']);
+    verifica($r['status'] === 403, 'token_pendente de outra marcação 403', $r);
+
+    $r = acao($m['id'], 'verificar', ['codigo' => $errado]);
     verifica($r['status'] === 422 && ($r['json']['erro']['codigo'] ?? '') === 'codigo_errado', 'código errado 422', $r);
     verifica(($r['json']['erro']['tentativas_restantes'] ?? null) === 4, 'tentativas_restantes = 4', $r);
-    $r = pedido('POST', $rota, ['codigo' => '12a']);
+    $r = acao($m['id'], 'verificar', ['codigo' => '12a']);
     verifica($r['status'] === 422 && ($r['json']['erro']['codigo'] ?? '') === 'codigo_invalido', 'código mal formado 422', $r);
 
-    $r = pedido('POST', "marcacoes/{$m['id']}/reenviar");
+    $r = acao($m['id'], 'reenviar');
     verifica($r['status'] === 200 && strlen((string)($r['json']['codigo_dev'] ?? '')) === 6, 'reenviar 200 com novo código', $r);
     $novo = (string)($r['json']['codigo_dev'] ?? '');
-    $r = pedido('POST', $rota, ['codigo' => $m['codigo'] === $novo ? $errado : $m['codigo']]);
+    $r = acao($m['id'], 'verificar', ['codigo' => $m['codigo'] === $novo ? $errado : $m['codigo']]);
     verifica($r['status'] === 422, 'código antigo deixa de valer após reenvio', $r);
 
-    $r = pedido('POST', $rota, ['codigo' => $novo]);
+    $r = acao($m['id'], 'verificar', ['codigo' => $novo]);
     verifica($r['status'] === 200 && ($r['json']['estado'] ?? '') === 'confirmada', 'código certo confirma', $r);
     verifica(preg_match('/^[0-9a-f]{64}$/', (string)($r['json']['token'] ?? '')) === 1, 'token hex de 64', $r);
     $GLOBALS['token'] = (string)($r['json']['token'] ?? '');
 
     // Review Focus 5: nunca confirmar duas vezes
-    $r = pedido('POST', $rota, ['codigo' => $novo]);
+    $r = acao($m['id'], 'verificar', ['codigo' => $novo]);
     verifica($r['status'] === 409 && ($r['json']['erro']['codigo'] ?? '') === 'ja_confirmada', 'verificar de novo 409 ja_confirmada', $r);
     $r = pedido('POST', 'marcacoes/999999/verificar', ['codigo' => '123456']);
     verifica($r['status'] === 404 && ($r['json']['erro']['codigo'] ?? '') === 'marcacao_nao_encontrada', 'marcação inexistente 404', $r);
 
     // Limite de tentativas: à 5.ª errada a marcação expira (regra de publico/verificar.php)
     [$a, $b] = $GLOBALS['marcacoes_extra'] ?? [0, 0];
-    for ($i = 1; $i <= 4; $i++) $r = pedido('POST', "marcacoes/$a/verificar", ['codigo' => '000001']);
+    for ($i = 1; $i <= 4; $i++) $r = acao($a, 'verificar', ['codigo' => '000001']);
     verifica(($r['json']['erro']['tentativas_restantes'] ?? null) === 1, '4.ª errada deixa 1 tentativa', $r);
-    $r = pedido('POST', "marcacoes/$a/verificar", ['codigo' => '000001']);
+    $r = acao($a, 'verificar', ['codigo' => '000001']);
     verifica($r['status'] === 410 && ($r['json']['erro']['codigo'] ?? '') === 'expirada', '5.ª errada 410 expirada', $r);
-    $r = pedido('POST', "marcacoes/$a/reenviar");
+    $r = acao($a, 'reenviar');
     verifica($r['status'] === 410, 'reenviar marcação expirada 410', $r);
 
     // Limite de reenvios: 1 envio original + MAX_REENVIOS (2)
-    $r1 = pedido('POST', "marcacoes/$b/reenviar");
-    $r2 = pedido('POST', "marcacoes/$b/reenviar");
-    $r3 = pedido('POST', "marcacoes/$b/reenviar");
+    $r1 = acao($b, 'reenviar');
+    $r2 = acao($b, 'reenviar');
+    $r3 = acao($b, 'reenviar');
     verifica($r1['status'] === 200 && $r2['status'] === 200, 'dois reenvios permitidos', $r2);
     verifica($r3['status'] === 429 && ($r3['json']['erro']['codigo'] ?? '') === 'limite_reenvios', '3.º reenvio 429', $r3);
 }
@@ -311,6 +336,15 @@ function limpar_dados_teste(): void {
     echo "(limpeza: " . count($clientes) . " cliente(s) de teste removido(s))\n";
 }
 
+/* ===================== Revisão final #2: segredo ===================== */
+function teste_segredo(): void {
+    require_once __DIR__ . '/../_lib.php';
+    verifica(function_exists('segredoValido') && segredoValido(str_repeat('ab', 32)), 'segredo de 64 hex aceite');
+    verifica(function_exists('segredoValido') && !segredoValido('GERAR_COM_bin2hex(random_bytes(32))'), 'placeholder do example rejeitado');
+    verifica(function_exists('segredoValido') && !segredoValido(str_repeat('a', 63)), 'segredo de 63 rejeitado');
+    verifica(function_exists('segredoValido') && !segredoValido(''), 'segredo vazio rejeitado');
+}
+
 /** Review Focus 3: todas as rotas GET respondem JSON válido */
 function teste_sempre_json(): void {
     $rotas = [
@@ -325,7 +359,7 @@ function teste_sempre_json(): void {
 }
 
 /* ===================== Execução ===================== */
-$leitura = ['teste_barbearia', 'teste_catalogo', 'teste_disponibilidade', 'teste_sempre_json'];
+$leitura = ['teste_segredo', 'teste_barbearia','teste_catalogo', 'teste_disponibilidade', 'teste_sempre_json'];
 $escrita = ['teste_criar_marcacao', 'teste_verificar', 'teste_listar'];
 
 foreach ($leitura as $t) { if (function_exists($t)) { echo "--- $t\n"; $t(); } }

@@ -72,11 +72,33 @@ function resolverBarbearia(PDO $pdo, string $slug): array {
     return $b;
 }
 
-/** Token de acesso a uma marcação: HMAC do id + cliente (sem guardar nada na BD). */
+/** O segredo tem de ser exatamente 64 hex (bin2hex(random_bytes(32))); o placeholder do example nunca passa. */
+function segredoValido(string $s): bool {
+    return strlen($s) === 64 && ctype_xdigit($s);
+}
+
+function segredoApi(): string {
+    $s = (string)(credenciais()['api_segredo'] ?? '');
+    if (!segredoValido($s)) throw new RuntimeException('api_segredo inválido em credenciais.php (gera com bin2hex(random_bytes(32)))');
+    return $s;
+}
+
+/** Token de acesso a uma marcação confirmada: HMAC do id + cliente (sem guardar nada na BD). */
 function tokenMarcacao(int $marcacaoId, int $clienteId): string {
-    $segredo = (string)(credenciais()['api_segredo'] ?? '');
-    if (strlen($segredo) < 32) throw new RuntimeException('api_segredo em falta ou demasiado curto em credenciais.php');
-    return hash_hmac('sha256', $marcacaoId . '|' . $clienteId, $segredo);
+    return hash_hmac('sha256', $marcacaoId . '|' . $clienteId, segredoApi());
+}
+
+/** Token que prova ser quem criou a marcação (exigido para verificar/reenviar o código). */
+function tokenPendente(int $marcacaoId, int $clienteId): string {
+    return hash_hmac('sha256', 'pend|' . $marcacaoId . '|' . $clienteId, segredoApi());
+}
+
+function exigirTokenPendente(array $m, array $corpo): void {
+    $tok = $corpo['token_pendente'] ?? '';
+    $esperado = tokenPendente((int)$m['id'], (int)$m['cliente_id']);
+    if (!is_string($tok) || !hash_equals($esperado, $tok)) {
+        erro(403, 'token_invalido', 'Não foi possível validar este pedido. Faz uma nova marcação.');
+    }
 }
 
 /** URL base do site (até à pasta que contém api/), ex.: http://host/projeto/projeto/ */

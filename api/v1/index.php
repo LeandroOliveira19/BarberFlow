@@ -131,13 +131,15 @@ function h_disponibilidade(PDO $pdo, array $p): never {
 function modoDev(): bool { return (credenciais()['api_dev_devolver_codigo'] ?? false) === true; }
 
 function h_criar_marcacao(PDO $pdo, array $p): never {
-    $b   = resolverBarbearia($pdo, $p[0]);
+    $b = resolverBarbearia($pdo, $p[0]);
+    segredoApi(); // falha cedo (500) se o segredo não estiver configurado, antes de criar a marcação
     $res = criarMarcacao($pdo, $b, corpoJson());
     $out = [
         'marcacao_id'      => $res['marcacao_id'],
         'estado'           => $res['estado'],
         'codigo_expira_em' => $res['codigo_expira_em'],
         'email_enviado'    => $res['email_enviado'],
+        'token_pendente'   => tokenPendente($res['marcacao_id'], $res['cliente_id']),
     ];
     if (modoDev() && $res['codigo'] !== null) $out['codigo_dev'] = $res['codigo'];
     responder($out, 201);
@@ -151,7 +153,9 @@ function marcacaoOu404(PDO $pdo, string $id): array {
 
 function h_verificar(PDO $pdo, array $p): never {
     $m = marcacaoOu404($pdo, $p[0]);
-    $codigo = corpoJson()['codigo'] ?? '';
+    $corpo = corpoJson();
+    exigirTokenPendente($m, $corpo); // também garante que o segredo é válido antes de confirmar
+    $codigo = $corpo['codigo'] ?? '';
     $ok = verificarCodigo($pdo, $m, is_scalar($codigo) ? (string)$codigo : '');
     responder([
         'marcacao_id' => (int)$ok['id'],
@@ -161,7 +165,8 @@ function h_verificar(PDO $pdo, array $p): never {
 }
 
 function h_reenviar(PDO $pdo, array $p): never {
-    $m   = marcacaoOu404($pdo, $p[0]);
+    $m = marcacaoOu404($pdo, $p[0]);
+    exigirTokenPendente($m, corpoJson());
     $res = reenviarCodigo($pdo, $m);
     $out = ['codigo_expira_em' => $res['codigo_expira_em'], 'email_enviado' => $res['email_enviado']];
     if (modoDev()) $out['codigo_dev'] = $res['codigo'];

@@ -89,7 +89,7 @@ function validarDadosMarcacao(PDO $pdo, int $bid, array $d): array {
 /**
  * Cria a marcação (transação idêntica a publico/marcar.php) e envia o código por email depois do commit.
  * @param array{id:int, nome:string} $barbearia
- * @return array{marcacao_id:int, estado:string, codigo_expira_em:?string, codigo:?string, email_enviado:bool}
+ * @return array{marcacao_id:int, cliente_id:int, estado:string, codigo_expira_em:?string, codigo:?string, email_enviado:bool}
  */
 function criarMarcacao(PDO $pdo, array $barbearia, array $dados): array {
     $bid = (int)$barbearia['id'];
@@ -165,6 +165,7 @@ function criarMarcacao(PDO $pdo, array $barbearia, array $dados): array {
 
     return [
         'marcacao_id'      => $marcacaoId,
+        'cliente_id'       => $clienteId,
         'estado'           => $verificar ? 'pendente_verificacao' : 'confirmada',
         'codigo_expira_em' => $expira,
         'codigo'           => $codigo,
