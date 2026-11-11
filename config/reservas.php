@@ -8,6 +8,7 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/marcacoes.php';
+require_once __DIR__ . '/mailer_codigo.php';
 
 final class ReservaErro extends RuntimeException {
     public function __construct(
