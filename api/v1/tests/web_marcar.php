@@ -65,6 +65,19 @@ try {
     $ok((int)$q->fetchColumn() === 1, 'para_nome guardado na marcação');
     $pagina = http("$BASE/index.php?m=marcar&slug=rlbarber&servico=$sv&barbeiro=$bb&data=$data");
     $ok(str_contains($pagina, 'name="para_nome"'), 'formulário tem o campo "Para quem é a marcação?"');
+
+    // Token CSRF errado (sessão expirada / outro separador): nada é gravado e o formulário volta com os dados
+    @unlink($jar); $jar = tempnam(sys_get_temp_dir(), 'cj');
+    http("$BASE/index.php?m=marcar&slug=rlbarber");
+    $html5 = http("$BASE/index.php?m=marcar&slug=rlbarber", [
+        'csrf' => 'token-antigo', 'servico' => $sv, 'barbeiro' => $bb, 'data' => $data, 'hora' => $horas[0],
+        'nome' => 'Cliente Token Velho', 'telemovel' => $tel, 'email' => 'site@example.com',
+    ]);
+    $ok($GLOBALS['ULTIMO_STATUS'] === 200 && str_contains($html5, 'A sessão expirou') && str_contains($html5, 'value="Cliente Token Velho"'),
+        'CSRF errado mostra "A sessão expirou" e mantém o nome escrito');
+    $q = $pdo->prepare("SELECT COUNT(*) FROM marcacoes m JOIN clientes c ON c.id = m.cliente_id WHERE c.telemovel = ?");
+    $q->execute([$tel]);
+    $ok((int)$q->fetchColumn() === 2, 'CSRF errado não cria marcação');
 } finally {
     require_once __DIR__ . '/../../../config/db.php';
     $pdo->prepare("DELETE v FROM verificacoes v JOIN marcacoes m ON m.id = v.marcacao_id JOIN clientes c ON c.id = m.cliente_id WHERE c.barbearia_id = 1 AND c.telemovel = ?")->execute([$tel]);

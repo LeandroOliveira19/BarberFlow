@@ -63,7 +63,7 @@ $sucesso = null;
 
 /* ---------- POST: criar marcação ---------- */
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!hash_equals($_SESSION['csrf'], (string)($_POST['csrf'] ?? ''))) {
+    if (!$csrfValido) {   // validado no index.php
         $erro = 'A sessão expirou. Recarrega a página e tenta de novo.';
     } elseif (!empty($_POST['website'])) {
         // campo isco: só os bots o preenchem

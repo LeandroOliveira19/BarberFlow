@@ -62,7 +62,7 @@ $m = normalizarEstado($pdo, $m, $bid);
 
 /* ---------- POST ---------- */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $m['estado'] === 'pendente_verificacao') {
-    if (!hash_equals($_SESSION['csrf'], (string)($_POST['csrf'] ?? ''))) {
+    if (!$csrfValido) {   // validado no index.php
         $erro = 'A sessão expirou. Recarrega a página.';
     } else {
         $acao = (string)($_POST['acao'] ?? '');
