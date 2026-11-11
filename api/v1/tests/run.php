@@ -1,0 +1,106 @@
+<?php
+declare(strict_types=1);
+
+/**
+ * Testes da API v1 (CLI).
+ * Uso: php api/v1/tests/run.php [base_url] [--so-leitura]
+ *   base_url por omissão: http://127.0.0.1:8080/projeto/projeto/api/v1/index.php
+ *   --so-leitura: só testes GET (para correr contra a UA sem criar dados)
+ */
+
+$args = array_slice($argv, 1);
+$SO_LEITURA = in_array('--so-leitura', $args, true);
+$args = array_values(array_filter($args, fn($a) => $a !== '--so-leitura'));
+$BASE = $args[0] ?? 'http://127.0.0.1:8080/projeto/projeto/api/v1/index.php';
+
+$FALHAS = 0;
+$TOTAL  = 0;
+
+/** @return array{status:int, json:mixed, tipo:string, corpo:string} */
+function pedido(string $metodo, string $rota, ?array $corpo = null, array $query = []): array {
+    global $BASE;
+    $url = $BASE . '?' . http_build_query(['r' => $rota] + $query);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_CUSTOMREQUEST  => $metodo,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 60,
+    ]);
+    if ($corpo !== null) {
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($corpo));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    }
+    $resp = curl_exec($ch);
+    if ($resp === false) {
+        $erro = curl_error($ch);
+        curl_close($ch);
+        return ['status' => 0, 'json' => null, 'tipo' => '', 'corpo' => $erro];
+    }
+    $status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+    $tipo   = (string)curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+    curl_close($ch);
+    return ['status' => $status, 'json' => json_decode((string)$resp, true), 'tipo' => $tipo, 'corpo' => (string)$resp];
+}
+
+function verifica(bool $cond, string $descricao, ?array $resp = null): void {
+    global $FALHAS, $TOTAL;
+    $TOTAL++;
+    if ($cond) {
+        echo "OK      $descricao\n";
+    } else {
+        $FALHAS++;
+        $extra = $resp ? '  [' . $resp['status'] . '] ' . substr($resp['corpo'], 0, 200) : '';
+        echo "FALHOU  $descricao$extra\n";
+    }
+}
+
+function saltado(string $descricao): void { echo "SALTADO $descricao\n"; }
+
+/* ===================== Task 1 ===================== */
+function teste_barbearia(): void {
+    $r = pedido('GET', 'barbearias/rlbarber');
+    verifica($r['status'] === 200, 'barbearia rlbarber 200', $r);
+    verifica(($r['json']['slug'] ?? null) === 'rlbarber', 'slug devolvido', $r);
+    verifica(is_array($r['json']['dias_funcionamento'] ?? null), 'dias_funcionamento é lista', $r);
+    verifica(($r['json']['max_dias'] ?? null) === 30, 'max_dias = MAX_DIAS', $r);
+    verifica(($r['json']['codigo_validade_min'] ?? null) === 15, 'codigo_validade_min = 15', $r);
+    $r = pedido('GET', 'barbearias/nao-existe');
+    verifica($r['status'] === 404 && ($r['json']['erro']['codigo'] ?? '') === 'barbearia_nao_encontrada', 'slug inexistente 404', $r);
+    $r = pedido('GET', 'coisa/qualquer');
+    verifica($r['status'] === 404 && ($r['json']['erro']['codigo'] ?? '') === 'rota_nao_encontrada', 'rota inexistente 404', $r);
+    $r = pedido('POST', 'barbearias/rlbarber', []);
+    verifica($r['status'] === 405, 'método errado 405', $r);
+    $r = pedido('OPTIONS', 'barbearias/rlbarber');
+    verifica($r['status'] === 204, 'preflight CORS 204', $r);
+}
+
+/** Review Focus 3: todas as rotas GET respondem JSON válido */
+function teste_sempre_json(): void {
+    $rotas = [
+        'barbearias/rlbarber', 'barbearias/nao-existe', 'coisa/qualquer',
+        'barbearias/rlbarber/servicos', 'barbearias/rlbarber/equipa', 'barbearias/rlbarber/reviews',
+        'barbearias/rlbarber/disponibilidade', 'marcacoes',
+    ];
+    foreach ($rotas as $rota) {
+        $r = pedido('GET', $rota);
+        verifica(str_starts_with($r['tipo'], 'application/json') && $r['json'] !== null, "JSON válido em $rota", $r);
+    }
+}
+
+/* ===================== Execução ===================== */
+$leitura = ['teste_barbearia', 'teste_catalogo', 'teste_disponibilidade', 'teste_sempre_json'];
+$escrita = ['teste_criar_marcacao', 'teste_verificar', 'teste_listar'];
+
+foreach ($leitura as $t) { if (function_exists($t)) { echo "--- $t\n"; $t(); } }
+if ($SO_LEITURA) {
+    if (function_exists('teste_listar_leitura')) { echo "--- teste_listar_leitura\n"; teste_listar_leitura(); }
+} else {
+    try {
+        foreach ($escrita as $t) { if (function_exists($t)) { echo "--- $t\n"; $t(); } }
+    } finally {
+        if (function_exists('limpar_dados_teste')) limpar_dados_teste();
+    }
+}
+
+echo "\n$TOTAL testes, $FALHAS falhas\n";
+exit($FALHAS > 0 ? 1 : 0);

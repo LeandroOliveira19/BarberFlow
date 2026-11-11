@@ -16,5 +16,12 @@ return [
     // Chaves de API (Integrações)
     'apify_token' => '',
     'brevo_api_key' => '',
-    'google_api_key' => ''
+    'google_api_key' => '',
+
+    // API v1 (app mobile)
+    'api_segredo' => 'GERAR_COM_bin2hex(random_bytes(32))',
+    'api_dev_devolver_codigo' => false, // true só em desenvolvimento local
+
+    // Opcional: BD local de desenvolvimento (sem estas chaves usa a BD da UA)
+    // 'db_host' => '127.0.0.1', 'db_user' => 'root', 'db_pass' => '',
 ];
