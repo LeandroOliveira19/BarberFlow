@@ -215,16 +215,39 @@ function teste_criar_marcacao(): void {
     $r = pedido('POST', 'barbearias/rlbarber/marcacoes', ['servico_id' => 'x']);
     verifica($r['status'] === 400 || $r['status'] === 422, 'corpo incompleto 400/422', $r);
 
-    // Review Focus 2: formatos diferentes do mesmo telemóvel caem no mesmo cliente
+    // Regra nova: um cliente só tem uma marcação ativa por dia (Review Focus 2: noutro formato do mesmo telemóvel)
     $tel00 = '00351' . $GLOBALS['tel_digitos'];
-    $r2 = novaMarcacao($horas[1], $tel00);
-    $r3 = novaMarcacao($horas[2], $GLOBALS['tel_digitos']);
-    verifica($r2['status'] === 201 && $r3['status'] === 201, '2.ª e 3.ª marcações do mesmo cliente 201', $r3);
+    $r = novaMarcacao($horas[1], $tel00);
+    verifica($r['status'] === 409 && ($r['json']['erro']['codigo'] ?? '') === 'marcacao_no_dia', '2.ª marcação do mesmo cliente no mesmo dia 409', $r);
+    $r = novaMarcacao($horas[1], $GLOBALS['tel_outro']);
+    verifica($r['status'] === 201, 'outro cliente no mesmo dia continua a poder marcar', $r);
+
+    // Limite de marcações ativas (MAX_MARCACOES_ATIVAS_CLIENTE = 3), agora em dias diferentes
+    $dias = outrosDiasComSlot(3);
+    verifica(count($dias) === 3, 'há 3 outros dias com horários livres');
+    if (count($dias) < 3) return;
+    $r2 = novaMarcacao($dias[0][1], $tel00, EMAIL_TESTE, ['data' => $dias[0][0]]);
+    $r3 = novaMarcacao($dias[1][1], $GLOBALS['tel_digitos'], EMAIL_TESTE, ['data' => $dias[1][0]]);
+    verifica($r2['status'] === 201 && $r3['status'] === 201, '2.ª e 3.ª marcações do mesmo cliente (outros dias) 201', $r3);
     guardarPendente($r2);
     guardarPendente($r3);
-    $r4 = novaMarcacao($horas[3], '+351' . $GLOBALS['tel_digitos']);
+    $r4 = novaMarcacao($dias[2][1], '+351' . $GLOBALS['tel_digitos'], EMAIL_TESTE, ['data' => $dias[2][0]]);
     verifica($r4['status'] === 409 && ($r4['json']['erro']['codigo'] ?? '') === 'limite_marcacoes', '4.ª marcação ativa 409 limite_marcacoes', $r4);
     $GLOBALS['marcacoes_extra'] = [(int)($r2['json']['marcacao_id'] ?? 0), (int)($r3['json']['marcacao_id'] ?? 0)];
+}
+
+/** Primeiro horário livre de $n dias diferentes (depois do dia de teste), para o mesmo serviço e barbeiro. */
+function outrosDiasComSlot(int $n): array {
+    $s = $GLOBALS['slot_teste'];
+    $res = [];
+    $dia = new DateTime($s['data']);
+    for ($i = 0; $i < 25 && count($res) < $n; $i++) {
+        $dia->modify('+1 day');
+        $d = pedido('GET', 'barbearias/rlbarber/disponibilidade', null, [
+            'servico_id' => $s['servico_id'], 'barbeiro_id' => $s['barbeiro_id'], 'data' => $dia->format('Y-m-d')]);
+        if (!empty($d['json']['slots'])) $res[] = [$dia->format('Y-m-d'), $d['json']['slots'][0]];
+    }
+    return $res;
 }
 
 /* ===================== Task 5 ===================== */

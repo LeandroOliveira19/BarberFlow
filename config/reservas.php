@@ -120,6 +120,21 @@ function criarMarcacao(PDO $pdo, array $barbearia, array $dados): array {
         $st->execute([$bid, $v['nome'], $v['telemovel'], $v['email'] !== '' ? $v['email'] : null]);
         $clienteId = (int)$pdo->lastInsertId();
 
+        // Regra definida pelo grupo: no máximo uma marcação ativa por cliente e por dia.
+        // Contam as confirmadas/concluídas e as pendentes cujo código ainda não expirou.
+        $diaIni = (clone $v['dia'])->setTime(0, 0);
+        $diaFim = (clone $diaIni)->modify('+1 day');
+        $st = $pdo->prepare(
+            "SELECT COUNT(*) FROM marcacoes
+             WHERE barbearia_id = ? AND cliente_id = ? AND inicio >= ? AND inicio < ?
+               AND (estado IN ('confirmada','concluida')
+                    OR (estado = 'pendente_verificacao' AND (codigo_expira_em IS NULL OR codigo_expira_em > ?)))"
+        );
+        $st->execute([$bid, $clienteId, $diaIni->format('Y-m-d H:i:s'), $diaFim->format('Y-m-d H:i:s'), $agora]);
+        if ((int)$st->fetchColumn() > 0) {
+            throw new ReservaErro(409, 'marcacao_no_dia', 'Já tens uma marcação para este dia. Escolhe outro dia ou contacta a barbearia.');
+        }
+
         $st = $pdo->prepare(
             "SELECT COUNT(*) FROM marcacoes
              WHERE barbearia_id = ? AND cliente_id = ? AND inicio > ?
