@@ -7,13 +7,9 @@ $msg = '';
 $erro = '';
 
 // 2. Ir buscar os dados atuais
-$stmt = $pdo->prepare("SELECT nome, morada FROM barbearias WHERE id = ?");
-$stmt->execute([$bid]);
-$barbearia = $stmt->fetch();
-
-$stmt = $pdo->prepare("SELECT chave, valor FROM configuracoes WHERE barbearia_id = ?");
-$stmt->execute([$bid]);
-$config = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+$definicoes = new Configuracao($pdo, $bid);   // objects/Configuracao.php
+$barbearia  = $definicoes->dadosBarbearia();
+$config     = $definicoes->read();
 
 function cfg(string $key, string $default = ''): string {
     global $config;

@@ -18,12 +18,10 @@ $nova_pass_info = '';
 
     if ($nome) {
         if ($id > 0) {
-            $stmt = $pdo->prepare("UPDATE fornecedores SET nome=?, contacto=?, telefone=?, email=?, nif=? WHERE id=? AND barbearia_id=?");
-            $stmt->execute([$nome, $contacto, $telefone, $email, $nif, $id, $bid]);
+            (new Fornecedor($pdo, $bid))->update($id, compact('nome', 'contacto', 'telefone', 'email', 'nif'));
             $msg = 'Fornecedor atualizado.';
         } else {
-            $stmt = $pdo->prepare("INSERT INTO fornecedores (barbearia_id, nome, contacto, telefone, email, nif) VALUES (?, ?, ?, ?, ?, ?)");
-            $stmt->execute([$bid, $nome, $contacto, $telefone, $email, $nif]);
+            (new Fornecedor($pdo, $bid))->create(compact('nome', 'contacto', 'telefone', 'email', 'nif'));
             $msg = 'Fornecedor adicionado.';
         }
     }

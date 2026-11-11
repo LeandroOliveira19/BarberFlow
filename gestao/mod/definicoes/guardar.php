@@ -13,8 +13,8 @@ $nova_pass_info = '';
     $morada = trim($_POST['morada'] ?? '');
     
     if ($nome && $morada) {
-        $stmt = $pdo->prepare("UPDATE barbearias SET nome = ?, morada = ? WHERE id = ?");
-        $stmt->execute([$nome, $morada, $bid]);
+        $definicoes = new Configuracao($pdo, $bid);   // objects/Configuracao.php
+        $definicoes->atualizarBarbearia($nome, $morada);
 
         $configs = [
             'slogan' => $_POST['slogan'] ?? '',
@@ -33,11 +33,7 @@ $nova_pass_info = '';
             'galeria_img_3' => $_POST['galeria_img_3'] ?? ''
         ];
 
-        $stmtCfg = $pdo->prepare("INSERT INTO configuracoes (barbearia_id, chave, valor) VALUES (?, ?, ?) 
-                                  ON DUPLICATE KEY UPDATE valor = VALUES(valor)");
-        foreach ($configs as $chave => $valor) {
-            $stmtCfg->execute([$bid, $chave, $valor]);
-        }
+        $definicoes->save($configs);
         $msg = 'Definições guardadas com sucesso!';
     }
 

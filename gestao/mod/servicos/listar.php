@@ -7,15 +7,12 @@ $msg = '';
 $erro = '';
 
 
-$stmt = $pdo->prepare("SELECT * FROM servicos WHERE barbearia_id = ? AND ativo = 1 ORDER BY nome");
-$stmt->execute([$bid]);
-$servicos = $stmt->fetchAll();
+$servico  = new Servico($pdo, $bid);   // objects/Servico.php (CRUD em POO)
+$servicos = $servico->read();
 
 $editar = null;
 if (isset($_GET['editar'])) {
-    $stmt = $pdo->prepare("SELECT * FROM servicos WHERE id = ? AND barbearia_id = ?");
-    $stmt->execute([(int)$_GET['editar'], $bid]);
-    $editar = $stmt->fetch();
+    $editar = $servico->readOne((int)$_GET['editar']);
 }
 ?>
 
