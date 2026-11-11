@@ -1,99 +1,81 @@
 <?php
 declare(strict_types=1);
+
+/**
+ * BarberFlow — ponto de entrada ÚNICO da área de gestão (modelo da atividade 06 de PAW).
+ *
+ *   1. Verifica a sessão (sem sessão → login.php) e a obrigação de alterar a password.
+ *   2. Obtém o módulo e a ação (?m=...&a=...) e valida-os contra a lista do perfil.
+ *   3. Em pedidos POST, valida o token CSRF (segurança centralizada aqui).
+ *   4. Inclui o ficheiro do módulo (mod/<módulo>/<ação>.php) com a saída em buffer,
+ *      para que as ações de escrita possam redirecionar (POST → Redirect → GET).
+ *   5. Desenha a estrutura da página: cabeçalho, menu, mensagens, conteúdo do módulo, rodapé.
+ */
+
 require __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../config/marcacoes.php';   // utilitários partilhados (e(), corHex(), ...)
+require_once __DIR__ . '/../config/modular.php';
+ini_set('display_errors', '0');
+
 session_start();
 
-// 1. Proteção de Acesso
-if (!isset($_SESSION['utilizador_id'])) {
+/* ---------- 1. Sessão ---------- */
+if (!isset($_SESSION['utilizador_id'], $_SESSION['barbearia_id'], $_SESSION['tipo'])) {
+    session_destroy();
     header('Location: login.php');
     exit;
 }
 
-$nome_utilizador = $_SESSION['utilizador_nome'];
-$tipo_utilizador = $_SESSION['tipo'];
-$barbearia_id    = $_SESSION['barbearia_id'];
-$uid             = (int)$_SESSION['utilizador_id'];
+$perfil  = $_SESSION['tipo'] === 'gestor' ? 'gestor' : 'barbeiro';
+$eGestor = $perfil === 'gestor';
+$bid     = (int)$_SESSION['barbearia_id'];
 
-$eGestor = ($tipo_utilizador === 'gestor');
+/** Módulos e ações permitidos a cada perfil (lista branca). A 1.ª ação de cada módulo é a de leitura. */
+$MODULOS = [
+    'gestor' => [
+        'dashboard' => ['ver'],
+    ],
+    'barbeiro' => [
+        'dashboard' => ['ver'],
+    ],
+];
 
-// ==========================================
-// 2. ESTATÍSTICAS DIFERENCIADAS POR PERFIL
-// ==========================================
-if ($eGestor) {
-    // --- ESTATÍSTICAS DO GESTOR ---
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM servicos WHERE barbearia_id = ? AND ativo = 1");
-    $stmt->execute([$barbearia_id]);
-    $total_servicos = $stmt->fetchColumn();
+/* ---------- 2. Módulo e ação ---------- */
+$modulo = lerParametro('m', 'dashboard');
+$acao   = lerParametro('a', $MODULOS[$perfil][$modulo][0] ?? 'ver');
 
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM marcacoes WHERE barbearia_id = ? AND DATE(inicio) = CURDATE()");
-    $stmt->execute([$barbearia_id]);
-    $marcacoes_hoje = $stmt->fetchColumn();
-
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM pedidos_reposicao WHERE barbearia_id = ? AND estado = 'pendente'");
-    $stmt->execute([$barbearia_id]);
-    $pedidos_pendentes = $stmt->fetchColumn();
-    
-    $txt_card_1 = 'Marcações Hoje (Total)';
-    $txt_card_2 = 'Serviços Ativos';
-    $txt_card_3 = 'Pedidos Pendentes';
-    $txt_welcome = 'A partir daqui poderás gerir a agenda global, os serviços e o stock da tua barbearia.';
-} else {
-    // --- ESTATÍSTICAS DO BARBEIRO ---
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM marcacoes WHERE barbearia_id = ? AND barbeiro_id = ? AND DATE(inicio) = CURDATE()");
-    $stmt->execute([$barbearia_id, $uid]);
-    $marcacoes_hoje = $stmt->fetchColumn();
-
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM marcacoes WHERE barbearia_id = ? AND barbeiro_id = ? AND estado = 'concluida'");
-    $stmt->execute([$barbearia_id, $uid]);
-    $total_servicos = $stmt->fetchColumn(); // Marcações concluídas
-
-    // Pedidos pendentes da bancada dele
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) FROM pedidos_reposicao pr 
-        JOIN bancadas b ON pr.bancada_id = b.id 
-        WHERE pr.barbearia_id = ? AND b.barbeiro_id = ? AND pr.estado = 'pendente'
-    ");
-    $stmt->execute([$barbearia_id, $uid]);
-    $pedidos_pendentes = $stmt->fetchColumn();
-    
-    $txt_card_1 = 'As Tuas Marcações Hoje';
-    $txt_card_2 = 'Serviços Concluídos';
-    $txt_card_3 = 'Os Teus Pedidos Pendentes';
-    $txt_welcome = 'A partir daqui poderás consultar a tua agenda diária e gerir o stock da tua bancada.';
+// Enquanto tiver de alterar a password, só o perfil está disponível (o logout é um ficheiro à parte)
+if (($_SESSION['precisa_alterar_password'] ?? 0) == 1 && $modulo !== 'perfil') {
+    redirecionar(urlModulo('perfil', 'editar', ['force' => 1]));
 }
 
-// 3. Chamar o Header (que já abre o HTML, o <body> e o Menu)
-require_once __DIR__ . '/includes/header.php'; 
-?>
+if (!validarModulo($modulo, $acao, $MODULOS[$perfil]) || !is_file(__DIR__ . "/mod/$modulo/$acao.php")) {
+    if (isset($_GET['m'])) flash('erro', 'Página não encontrada.');
+    $modulo = 'dashboard';
+    $acao   = 'ver';
+}
 
-<div class="main-content">
-    <div class="header">
-        <div>
-            <h1>Dashboard</h1>
-            <p style="color: var(--muted); margin-top: 0.5rem;">Bem-vindo de volta, <?= htmlspecialchars($nome_utilizador) ?> (<?= htmlspecialchars(ucfirst($tipo_utilizador)) ?>)</p>
-        </div>
-        <a href="logout.php" class="btn-logout">Terminar Sessão</a>
-    </div>
+/* ---------- 3. CSRF em todos os pedidos POST ---------- */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !csrfValido()) {
+    flash('erro', 'O formulário expirou. Tenta de novo.');
+    redirecionar(urlModulo($modulo, $MODULOS[$perfil][$modulo][0]));
+}
 
-    <div class="stats-grid">
-        <div class="stat-card">
-            <h3><?= $txt_card_1 ?></h3>
-            <div class="number"><?= $marcacoes_hoje ?></div>
-        </div>
-        <div class="stat-card">
-            <h3><?= $txt_card_2 ?></h3>
-            <div class="number"><?= $total_servicos ?></div>
-        </div>
-        <div class="stat-card">
-            <h3><?= $txt_card_3 ?></h3>
-            <div class="number"><?= $pedidos_pendentes ?></div>
-        </div>
-    </div>
+/* ---------- 4. Incluir o módulo (saída em buffer) ---------- */
+ob_start();
+require __DIR__ . "/mod/$modulo/$acao.php";
+$conteudo = (string)ob_get_clean();
 
-    <div class="welcome-box">
-        <h2>O teu sistema está online!</h2>
-        <p><?= $txt_welcome ?></p>
+/* ---------- 5. Desenhar a página ---------- */
+$mensagens = lerFlashes();
+require __DIR__ . '/layout/cabecalho.php';
+require __DIR__ . '/layout/menu.php';
+if ($mensagens): ?>
+    <div class="flashes">
+        <?php foreach ($mensagens as $f): ?>
+            <div class="flash flash-<?= e($f['tipo']) ?>"><?= e($f['texto']) ?></div>
+        <?php endforeach; ?>
     </div>
-</div>
-</body>
-</html>
+<?php endif;
+echo $conteudo;
+require __DIR__ . '/layout/rodape.php';

@@ -41,6 +41,35 @@ function teste_modular_helpers(): void {
     ok(urlModulo('servicos', 'listar', ['id' => 3]) === 'index.php?m=servicos&a=listar&id=3', 'urlModulo');
 }
 
+/* ===================== Task 2: gestao/index.php ===================== */
+function teste_gestao_base(): void {
+    global $BASE;
+    $anon = new Sessao($BASE);
+    $r = $anon->get('gestao/index.php?m=agenda&a=listar');
+    ok($r['status'] === 302 && str_contains($r['local'], 'login.php'), 'anónimo → login.php', $r);
+
+    $g = new Sessao($BASE);
+    ok($g->login(TESTE_GESTOR), 'login do gestor de teste');
+    $r = $g->get('gestao/index.php');
+    ok($r['status'] === 200 && str_contains($r['html'], 'Dashboard') && semErrosPhp($r['html']), 'gestor: dashboard 200 sem erros PHP', $r);
+    ok(str_contains($r['html'], 'class="sidebar"') && str_contains($r['html'], '</html>'), 'estrutura (menu + fecho) desenhada pelo index', $r);
+    ok(substr_count($r['html'], '<html') === 1, 'só um <html> (o módulo não desenha a estrutura)', $r);
+
+    // Review Focus 1: parâmetros maliciosos nunca incluem fora de mod/
+    foreach (['?m=../../config&a=db', '?m=dashboard&a=../../../config/db', '?m%5B%5D=x', '?m=DASHBOARD&a=ver', '?m=nao_existe&a=ver'] as $q) {
+        $r = $g->get('gestao/index.php' . $q);
+        ok($r['status'] === 200 && str_contains($r['html'], 'Dashboard') && semErrosPhp($r['html']), "parâmetros inválidos $q → dashboard", $r);
+    }
+    $r = $g->get('gestao/index.php?m=nao_existe&a=ver');
+    ok(str_contains($r['html'], 'Página não encontrada'), 'módulo inválido mostra aviso', $r);
+
+    // Acesso direto aos ficheiros incluídos
+    foreach (['gestao/mod/dashboard/ver.php', 'gestao/layout/cabecalho.php', 'gestao/layout/menu.php', 'gestao/layout/rodape.php'] as $f) {
+        $r = $anon->get($f);
+        ok($r['status'] === 302 && str_contains($r['local'], 'index.php'), "acesso direto bloqueado: $f", $r);
+    }
+}
+
 /* ===================== Execução ===================== */
 try {
     criarUtilizadoresTeste($pdo);
