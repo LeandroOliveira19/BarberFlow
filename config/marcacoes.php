@@ -116,7 +116,7 @@ function janelasDoDia(PDO $pdo, int $barbeiroId, int $diaIso, int $abre, int $fe
  * Ocupam horário: marcações confirmadas/concluídas e as pendentes de verificação cujo prazo ainda não terminou.
  * Com $bloquear = true usa FOR UPDATE (verificação final dentro da transação).
  */
-function slotsLivres(PDO $pdo, int $bid, int $barbeiroId, DateTime $dia, int $duracao, array $cfg, bool $bloquear = false): array {
+function slotsLivres(PDO $pdo, int $bid, int $barbeiroId, DateTime $dia, int $duracao, array $cfg, bool $bloquear = false, int $ignorarMarcacaoId = 0): array {
     if (!in_array((int)$dia->format('N'), diasFuncionamento($cfg), true)) return [];
 
     $abre  = paraMinutos((string)($cfg['hora_abertura'] ?? ''), 9 * 60);
@@ -132,10 +132,11 @@ function slotsLivres(PDO $pdo, int $bid, int $barbeiroId, DateTime $dia, int $du
             WHERE barbearia_id = ? AND barbeiro_id = ?
               AND inicio < ? AND fim > ?
               AND (estado IN ('confirmada','concluida')
-                   OR (estado = 'pendente_verificacao' AND (codigo_expira_em IS NULL OR codigo_expira_em > ?)))"
+                   OR (estado = 'pendente_verificacao' AND (codigo_expira_em IS NULL OR codigo_expira_em > ?)))
+              AND id <> ?"   // ao remarcar, a própria marcação não ocupa o horário
          . ($bloquear ? ' FOR UPDATE' : '');
     $st = $pdo->prepare($sql);
-    $st->execute([$bid, $barbeiroId, $fim->format('Y-m-d H:i:s'), $ini->format('Y-m-d H:i:s'), agoraSql()]);
+    $st->execute([$bid, $barbeiroId, $fim->format('Y-m-d H:i:s'), $ini->format('Y-m-d H:i:s'), agoraSql(), $ignorarMarcacaoId]);
     $ocupados = [];
     foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
         $ocupados[] = [strtotime($r['inicio']), strtotime($r['fim'])];

@@ -215,6 +215,7 @@ function criarMarcacao(PDO $pdo, array $barbearia, array $dados): array {
 function carregarMarcacaoPorId(PDO $pdo, int $id): ?array {
     $st = $pdo->prepare(
         "SELECT m.id, m.barbearia_id, b.nome AS barbearia_nome, b.slug AS barbearia_slug, m.cliente_id, c.email,
+                m.servico_id, m.barbeiro_id,
                 m.estado, m.inicio, m.fim, m.codigo_expira_em, m.tentativas_validacao,
                 s.nome AS servico_nome, u.nome AS barbeiro_nome, m.para_nome
          FROM marcacoes m
@@ -333,4 +334,116 @@ function barbeiroDaBarbearia(PDO $pdo, int $bid, int $barbeiroId): array {
         if ((int)$b['id'] === $barbeiroId) return $b;
     }
     throw new ReservaErro(404, 'barbeiro_nao_encontrado', 'Barbeiro não encontrado.');
+}
+
+/* ===================== Cancelar e remarcar pelo cliente (app) ===================== */
+
+/** Horas de antecedência para o cliente cancelar/remarcar (Definições da gestão); 24 por omissão. */
+function antecedenciaAlteracaoHoras(array $cfg): int {
+    $v = trim((string)($cfg['antecedencia_alteracao_horas'] ?? ''));
+    return (ctype_digit($v) && (int)$v <= 168) ? (int)$v : 24;
+}
+
+/** Só uma marcação confirmada e com início daqui a pelo menos N horas pode ser alterada pelo cliente. */
+function exigirAlteravel(array $m, array $cfg): void {
+    if ($m['estado'] !== 'confirmada') {
+        throw new ReservaErro(409, 'estado_invalido', 'Esta marcação já não pode ser alterada.');
+    }
+    $horas = antecedenciaAlteracaoHoras($cfg);
+    if (strtotime((string)$m['inicio']) - time() < $horas * 3600) {
+        throw new ReservaErro(409, 'fora_do_prazo', "Já não é possível alterar online (menos de {$horas} h). Contacta a barbearia.");
+    }
+}
+
+/** Relê a marcação com FOR UPDATE (dentro de uma transação) para decidir sobre o estado atual. */
+function marcacaoParaAlterar(PDO $pdo, int $id, int $bid): array {
+    $st = $pdo->prepare("SELECT id, cliente_id, barbeiro_id, servico_id, inicio, estado, para_nome, notas
+                         FROM marcacoes WHERE id = ? AND barbearia_id = ? FOR UPDATE");
+    $st->execute([$id, $bid]);
+    $m = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$m) throw new ReservaErro(404, 'marcacao_nao_encontrada', 'Marcação não encontrada.');
+    return $m;
+}
+
+function notaComRasto(?string $notas, string $linha): string {
+    $notas = trim((string)$notas);
+    return $notas === '' ? $linha : $notas . "\n" . $linha;
+}
+
+function cancelarMarcacaoCliente(PDO $pdo, array $m): void {
+    $bid = (int)$m['barbearia_id'];
+    $cfg = configBarbearia($pdo, $bid);
+    $pdo->beginTransaction();
+    try {
+        $atual = marcacaoParaAlterar($pdo, (int)$m['id'], $bid);
+        exigirAlteravel($atual, $cfg);
+        $nota = notaComRasto($atual['notas'], 'Cancelada pelo cliente na app em ' . date('d/m H:i'));
+        $pdo->prepare("UPDATE marcacoes SET estado = 'cancelada', notas = ? WHERE id = ? AND barbearia_id = ?")
+            ->execute([$nota, (int)$m['id'], $bid]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
+}
+
+/** Muda dia/hora/barbeiro da mesma marcação (continua confirmada). $d = [barbeiro_id, data, hora]. */
+function remarcarMarcacaoCliente(PDO $pdo, array $m, array $d): void {
+    $bid = (int)$m['barbearia_id'];
+    $cfg = configBarbearia($pdo, $bid);
+    $bb  = $d['barbeiro_id'] ?? null;
+    if (!is_int($bb) && !(is_string($bb) && ctype_digit($bb))) throw new ReservaErro(422, 'dados_invalidos', 'Escolhe o barbeiro.');
+    $barbeiro = barbeiroDaBarbearia($pdo, $bid, (int)$bb);
+    $dia = validarDataMarcacao((string)($d['data'] ?? ''));
+    if (!in_array((int)$dia->format('N'), diasFuncionamento($cfg), true)) {
+        throw new ReservaErro(422, 'data_invalida', 'A barbearia está encerrada nesse dia.');
+    }
+    $hora = (string)($d['hora'] ?? '');
+    if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $hora)) throw new ReservaErro(422, 'dados_invalidos', 'Escolhe um horário.');
+
+    $pdo->beginTransaction();
+    try {
+        $atual = marcacaoParaAlterar($pdo, (int)$m['id'], $bid);
+        exigirAlteravel($atual, $cfg);
+        $servico = servicoDaBarbearia($pdo, $bid, (int)$atual['servico_id']);
+
+        // Mesmo bloqueio do criarMarcacao, no barbeiro NOVO (evita duas pessoas na mesma hora)
+        $lock = $pdo->prepare("SELECT id FROM utilizadores WHERE id = ? AND barbearia_id = ? FOR UPDATE");
+        $lock->execute([(int)$barbeiro['id'], $bid]);
+        $lock->fetch();
+
+        $livres = slotsLivres($pdo, $bid, (int)$barbeiro['id'], $dia, (int)$servico['duracao_minutos'], $cfg, true, (int)$atual['id']);
+        if (!in_array($hora, $livres, true)) {
+            throw new ReservaErro(409, 'slot_ocupado', 'Esse horário não está disponível. Escolhe outro, por favor.');
+        }
+
+        // Uma marcação por pessoa e por dia, sem contar a própria
+        $pessoa = (string)($atual['para_nome'] ?? '');
+        $diaIni = (clone $dia)->setTime(0, 0);
+        $diaFim = (clone $diaIni)->modify('+1 day');
+        $st = $pdo->prepare(
+            "SELECT COUNT(*) FROM marcacoes
+             WHERE barbearia_id = ? AND cliente_id = ? AND COALESCE(para_nome, '') = ? AND inicio >= ? AND inicio < ? AND id <> ?
+               AND (estado IN ('confirmada','concluida')
+                    OR (estado = 'pendente_verificacao' AND (codigo_expira_em IS NULL OR codigo_expira_em > ?)))"
+        );
+        $st->execute([$bid, (int)$atual['cliente_id'], $pessoa, $diaIni->format('Y-m-d H:i:s'), $diaFim->format('Y-m-d H:i:s'), (int)$atual['id'], agoraSql()]);
+        if ((int)$st->fetchColumn() > 0) {
+            throw new ReservaErro(409, 'marcacao_no_dia', $pessoa === ''
+                ? 'Já tens uma marcação para esse dia. Escolhe outro dia ou contacta a barbearia.'
+                : "Já existe uma marcação para {$pessoa} nesse dia. Escolhe outro dia ou contacta a barbearia.");
+        }
+
+        [$h, $mi] = array_map('intval', explode(':', $hora));
+        $inicio = (clone $dia)->setTime($h, $mi);
+        $fim    = (clone $inicio)->modify('+' . (int)$servico['duracao_minutos'] . ' minutes');
+        $antes  = date('d/m H:i', strtotime((string)$atual['inicio'])) . ', ' . (string)($m['barbeiro_nome'] ?? '');
+        $nota   = notaComRasto($atual['notas'], 'Remarcada pelo cliente na app em ' . date('d/m H:i') . " (antes: {$antes})");
+        $pdo->prepare("UPDATE marcacoes SET barbeiro_id = ?, inicio = ?, fim = ?, notas = ? WHERE id = ? AND barbearia_id = ?")
+            ->execute([(int)$barbeiro['id'], $inicio->format('Y-m-d H:i:s'), $fim->format('Y-m-d H:i:s'), $nota, (int)$atual['id'], $bid]);
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        throw $e;
+    }
 }
