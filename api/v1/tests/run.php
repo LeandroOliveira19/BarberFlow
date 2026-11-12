@@ -378,6 +378,45 @@ function antecedenciaTeste(?int $horas): void {
     }
 }
 
+/**
+ * Simula um "criar marcação" noutra ligação: bloqueia o barbeiro, lança o remarcar em paralelo (que fica à espera)
+ * e depois pede a própria marcação, como faz o scan FOR UPDATE do slotsLivres. Devolve [sem deadlock?, resposta].
+ */
+function remarcarEnquantoOutroSeguraOBarbeiro(int $id, string $tok, int $barbeiroId, string $data, string $hora): array {
+    global $BASE;
+    bdTeste();   // define DB_NAME
+    $c = require __DIR__ . '/../../../config/credenciais.php';
+    $outra = new PDO('mysql:host=' . ($c['db_host'] ?? 'mysql-sa.mgmt.ua.pt') . ';dbname=' . DB_NAME . ';charset=utf8mb4',
+        $c['db_user'] ?? $c['user'], $c['db_pass'] ?? $c['pass'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    $outra->exec('SET SESSION innodb_lock_wait_timeout = 8');
+    $outra->beginTransaction();
+    $outra->prepare('SELECT id FROM utilizadores WHERE id = ? FOR UPDATE')->execute([$barbeiroId]);
+
+    $ch = curl_init($BASE . '?' . http_build_query(['r' => "marcacoes/$id/remarcar"]));
+    curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 30,
+        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+        CURLOPT_POSTFIELDS => json_encode(['token' => $tok, 'barbeiro_id' => $barbeiroId, 'data' => $data, 'hora' => $hora])]);
+    $mh = curl_multi_init();
+    curl_multi_add_handle($mh, $ch);
+    $ate = microtime(true) + 1.0;   // dá tempo ao pedido para chegar ao servidor e ficar à espera do bloqueio
+    do { curl_multi_exec($mh, $ativos); curl_multi_select($mh, 0.1); } while (microtime(true) < $ate);
+
+    $semDeadlock = true;
+    try {
+        $outra->prepare('SELECT id FROM marcacoes WHERE id = ? FOR UPDATE')->execute([$id]);
+        $outra->commit();
+    } catch (PDOException $e) {
+        $semDeadlock = false;
+        if ($outra->inTransaction()) $outra->rollBack();
+    }
+    do { curl_multi_exec($mh, $ativos); curl_multi_select($mh, 0.2); } while ($ativos > 0);
+    $corpo = (string)curl_multi_getcontent($ch);
+    $resp = ['status' => (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE), 'json' => json_decode($corpo, true), 'corpo' => $corpo];
+    curl_multi_remove_handle($mh, $ch);
+    curl_multi_close($mh);
+    return [$semDeadlock, $resp];
+}
+
 function notasMarcacao(int $id): string {
     $st = bdTeste()->prepare("SELECT COALESCE(notas, '') FROM marcacoes WHERE id = ?");
     $st->execute([$id]);
@@ -419,6 +458,21 @@ function teste_alterar(): void {
         'remarcar para horário sobreposto ao próprio 200', $r);
     verifica(($r['json']['barbeiro_id'] ?? null) === $s['barbeiro_id'] && is_string($r['json']['servico_nome'] ?? null), 'resposta no formato da lista', $r);
     verifica(str_contains(notasMarcacao($id), 'Remarcada pelo cliente na app'), 'notas com o rasto da remarcação');
+
+    // Revisão final #1: a disponibilidade pode ignorar a própria marcação (só com o token dela)
+    $q = ['servico_id' => $s['servico_id'], 'barbeiro_id' => $s['barbeiro_id'], 'data' => $s['data']];
+    $r = pedido('GET', 'barbearias/rlbarber/disponibilidade', null, $q);
+    verifica(!in_array($seguinte, (array)($r['json']['slots'] ?? []), true), 'disponibilidade normal: o horário da própria marcação está ocupado', $r);
+    $r = pedido('GET', 'barbearias/rlbarber/disponibilidade', null, $q + ['marcacao_id' => $id, 'token' => $tok]);
+    verifica(in_array($seguinte, (array)($r['json']['slots'] ?? []), true), 'disponibilidade com marcacao_id e token: a própria marcação não ocupa', $r);
+    $r = pedido('GET', 'barbearias/rlbarber/disponibilidade', null, $q + ['marcacao_id' => $id, 'token' => $adulterado]);
+    verifica($r['status'] === 200 && !in_array($seguinte, (array)($r['json']['slots'] ?? []), true), 'disponibilidade com token errado: ignorado', $r);
+
+    // Revisão final #2: ordem dos bloqueios. Um "criar" que já tem o barbeiro e depois precisa da marcação
+    // não pode entrar em deadlock com um remarcar que corre ao mesmo tempo.
+    [$semDeadlock, $rp] = remarcarEnquantoOutroSeguraOBarbeiro($id, $tok, $s['barbeiro_id'], $s['data'], $horas[0]);
+    verifica($semDeadlock, 'outro pedido obtém a marcação enquanto o remarcar espera pelo barbeiro (sem deadlock)');
+    verifica($rp['status'] === 200 && ($rp['json']['inicio'] ?? '') === "{$s['data']} {$horas[0]}:00", 'o remarcar concorrente termina com 200', $rp);
 
     $r = pedido('POST', "marcacoes/$id/remarcar", ['token' => $tok, 'barbeiro_id' => $s['barbeiro_id'], 'data' => $s['data'], 'hora' => $horas[1]]);
     verifica($r['status'] === 409 && ($r['json']['erro']['codigo'] ?? '') === 'slot_ocupado', 'remarcar para horário ocupado 409', $r);

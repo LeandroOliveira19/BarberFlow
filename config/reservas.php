@@ -401,16 +401,37 @@ function remarcarMarcacaoCliente(PDO $pdo, array $m, array $d): void {
     $hora = (string)($d['hora'] ?? '');
     if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $hora)) throw new ReservaErro(422, 'dados_invalidos', 'Escolhe um horário.');
 
+    // Um deadlock (o MariaDB escolhe esta transação como vítima) repete-se uma vez em vez de dar erro 500
+    for ($tentativa = 1; ; $tentativa++) {
+        try {
+            remarcarNaTransacao($pdo, $m, $bid, $cfg, $barbeiro, $dia, $hora);
+            return;
+        } catch (PDOException $e) {
+            $deadlock = in_array((string)$e->getCode(), ['40001', '1213'], true) || str_contains($e->getMessage(), '1213');
+            if (!$deadlock || $tentativa >= 2) throw $e;
+        }
+    }
+}
+
+/**
+ * Ordem dos bloqueios igual à do criarMarcacao (primeiro os barbeiros, depois as marcações), para não haver
+ * deadlock com quem está a criar: barbeiro antigo e novo por ordem de id → a marcação → horários livres.
+ */
+function remarcarNaTransacao(PDO $pdo, array $m, int $bid, array $cfg, array $barbeiro, DateTime $dia, string $hora): void {
     $pdo->beginTransaction();
     try {
+        $barbeiros = array_unique([(int)$m['barbeiro_id'], (int)$barbeiro['id']]);
+        sort($barbeiros);
+        $lock = $pdo->prepare("SELECT id FROM utilizadores WHERE id = ? AND barbearia_id = ? FOR UPDATE");
+        foreach ($barbeiros as $idBarbeiro) { $lock->execute([$idBarbeiro, $bid]); $lock->fetch(); }
+
         $atual = marcacaoParaAlterar($pdo, (int)$m['id'], $bid);
+        if ((int)$atual['barbeiro_id'] !== (int)$m['barbeiro_id']) {
+            // Mudou de barbeiro entretanto (outro pedido): não temos o bloqueio certo — o cliente tenta de novo
+            throw new ReservaErro(409, 'slot_ocupado', 'A marcação acabou de ser alterada. Atualiza a lista e tenta de novo.');
+        }
         exigirAlteravel($atual, $cfg);
         $servico = servicoDaBarbearia($pdo, $bid, (int)$atual['servico_id']);
-
-        // Mesmo bloqueio do criarMarcacao, no barbeiro NOVO (evita duas pessoas na mesma hora)
-        $lock = $pdo->prepare("SELECT id FROM utilizadores WHERE id = ? AND barbearia_id = ? FOR UPDATE");
-        $lock->execute([(int)$barbeiro['id'], $bid]);
-        $lock->fetch();
 
         $livres = slotsLivres($pdo, $bid, (int)$barbeiro['id'], $dia, (int)$servico['duracao_minutos'], $cfg, true, (int)$atual['id']);
         if (!in_array($hora, $livres, true)) {

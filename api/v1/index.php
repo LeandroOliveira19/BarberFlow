@@ -125,7 +125,17 @@ function h_disponibilidade(PDO $pdo, array $p): never {
 
     expirarPendentes($pdo, $b['id']);
     $cfg   = configBarbearia($pdo, $b['id']);
-    $slots = slotsLivres($pdo, $b['id'], $barbeiro, $dia, (int)$s['duracao_minutos'], $cfg, false);
+    // Ao remarcar, a app manda a marcação e o token dela: o horário atual dessa marcação não conta como ocupado
+    $ignorar = 0;
+    $mid = $_GET['marcacao_id'] ?? null;
+    $tok = $_GET['token'] ?? null;
+    if (is_string($mid) && ctype_digit($mid) && is_string($tok)) {
+        $m = carregarMarcacaoPorId($pdo, (int)$mid);
+        if ($m && (int)$m['barbearia_id'] === (int)$b['id'] && hash_equals(tokenMarcacao((int)$m['id'], (int)$m['cliente_id']), $tok)) {
+            $ignorar = (int)$m['id'];
+        }
+    }
+    $slots = slotsLivres($pdo, $b['id'], $barbeiro, $dia, (int)$s['duracao_minutos'], $cfg, false, $ignorar);
     responder(['data' => $dia->format('Y-m-d'), 'slots' => array_values($slots)]);
 }
 
