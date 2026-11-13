@@ -247,6 +247,40 @@ function teste_definicoes_antecedencia(Sessao $g): void {
     }
 }
 
+/* ===================== Requisitos web: pesquisa na agenda ===================== */
+function teste_pesquisa_agenda(): void {
+    global $BASE, $pdo;
+    criarMarcacaoTeste($pdo);   // "Cliente Rotas", 919990001, amanhã, barbeiro de teste
+    // Mesmo nome noutra barbearia: nunca pode aparecer
+    $bid2 = (int)$pdo->query("SELECT id FROM barbearias WHERE id <> 1 ORDER BY id LIMIT 1")->fetchColumn();
+    $sv2  = (int)$pdo->query("SELECT id FROM servicos WHERE barbearia_id = $bid2 LIMIT 1")->fetchColumn();
+    $bb2  = (int)$pdo->query("SELECT id FROM utilizadores WHERE barbearia_id = $bid2 LIMIT 1")->fetchColumn();
+    if ($bid2 && $sv2 && $bb2) {
+        $pdo->prepare("INSERT INTO clientes (barbearia_id, nome, telemovel, email) VALUES (?, 'Cliente Rotas Navalha', '919990002', 'rotas2@example.com')")->execute([$bid2]);
+        $cli2 = (int)$pdo->lastInsertId();
+        $ini = (new DateTime('tomorrow'))->setTime(11, 0)->format('Y-m-d H:i:s');
+        $pdo->prepare("INSERT INTO marcacoes (barbearia_id, cliente_id, barbeiro_id, servico_id, inicio, fim, estado) VALUES (?, ?, ?, ?, ?, DATE_ADD(?, INTERVAL 30 MINUTE), 'confirmada')")
+            ->execute([$bid2, $cli2, $bb2, $sv2, $ini, $ini]);
+        $GLOBALS['LIMPEZA'][] = "DELETE FROM marcacoes WHERE cliente_id = $cli2";
+        $GLOBALS['LIMPEZA'][] = "DELETE FROM clientes WHERE id = $cli2";
+    }
+    $g = new Sessao($BASE); $g->login(TESTE_GESTOR);
+    $b = new Sessao($BASE); $b->login(TESTE_BARBEIRO);
+    $url = fn(string $q) => 'gestao/index.php?m=agenda&a=listar&vista=proximas&q=' . rawurlencode($q);
+
+    $r = $g->get($url('Rotas'));
+    ok(str_contains($r['html'], 'Cliente Rotas') && !str_contains($r['html'], 'Navalha'), 'pesquisa pelo nome encontra e não mostra outra barbearia', $r);
+    ok(str_contains($r['html'], 'name="q"') && str_contains($r['html'], 'value="Rotas"'), 'o campo de pesquisa mantém o texto', $r);
+    $r = $g->get($url('99900'));
+    ok(str_contains($r['html'], 'Cliente Rotas'), 'pesquisa por parte do telemóvel', $r);
+    $r = $g->get($url('%'));
+    ok(!str_contains($r['html'], 'Cliente Rotas') && semErrosPhp($r['html']), '"%" é texto, não um curinga', $r);
+    $r = $g->get($url('Ninguem Com Este Nome'));
+    ok(!str_contains($r['html'], 'Cliente Rotas'), 'pesquisa sem resultados', $r);
+    $r = $b->get($url('Rotas'));
+    ok(str_contains($r['html'], 'Cliente Rotas'), 'barbeiro encontra as suas marcações', $r);
+}
+
 /* ===================== Task 5: stock e pedidos ===================== */
 function teste_stock_pedidos(): void {
     global $BASE, $pdo;
@@ -347,7 +381,7 @@ function teste_publico(): void {
 try {
     criarUtilizadoresTeste($pdo);
     foreach (['teste_modular_helpers', 'teste_gestao_base', 'teste_agenda_perfil', 'teste_modulos_gestor',
-              'teste_stock_pedidos', 'teste_publico'] as $t) {
+              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda'] as $t) {
         if (function_exists($t)) { echo "--- $t\n"; $t(); }
     }
 } finally {
