@@ -67,11 +67,11 @@ e, se for para aparecer no menu, uma entrada em `gestao/layout/menu.php`.
 **Testes** (na raiz, com o XAMPP ligado): `php api/v1/tests/run.php`, `web_rotas.php`,
 `web_objects.php` e `web_marcar.php`.
 
-## 🔐 Credenciais de Teste
+## Credenciais de Teste
 - **Gestor:** `gestor@barberflow.pt` (Password: `123456`)
 - **Barbeiro:** `andre@barberflow.pt` (Password: `barbeiro123`)
 
-## ✨ Funcionalidades Principais
+## Funcionalidades Principais
 - [x] Isolamento de dados Multi-Tenant (ex: RLBarber e Navalha de Ouro).
 - [x] Tematização dinâmica (cores e layouts diferentes por barbearia).
 - [x] Registo de marcações com validação de horários.
