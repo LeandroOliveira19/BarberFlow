@@ -79,18 +79,7 @@ $segredo2fa = $tem2fa ? '' : (string)$_SESSION['totp_pendente'];
             <?php if ($forcar_alteracao): ?>
                 <div class="form-section">
                     <h3>Alterar Password (Obrigatório)</h3>
-                    <form method="POST" action="<?= e(urlModulo('perfil', 'alterar_password')) ?>">
-                        <?= campoCsrf() ?>
-                        <div class="input-group">
-                            <label>Nova Password</label>
-                            <input type="password" name="nova_password" required placeholder="Mínimo 6 caracteres">
-                        </div>
-                        <div class="input-group">
-                            <label>Confirmar Nova Password</label>
-                            <input type="password" name="confirmar_password" required placeholder="Repete a password">
-                        </div>
-                        <button type="submit" class="btn-submit">Guardar Nova Password</button>
-                    </form>
+                    <?php require __DIR__ . '/_form_senha.php'; ?>
                 </div>
             <?php else: ?>
                 <div class="form-section">
@@ -135,18 +124,7 @@ $segredo2fa = $tem2fa ? '' : (string)$_SESSION['totp_pendente'];
                     <details class="password-toggle">
                         <summary>Alterar a minha Password</summary>
                         <div class="details-content">
-                            <form method="POST" action="<?= e(urlModulo('perfil', 'alterar_password')) ?>">
-                                <?= campoCsrf() ?>
-                                <div class="input-group">
-                                    <label>Nova Password</label>
-                                    <input type="password" name="nova_password" required>
-                                </div>
-                                <div class="input-group">
-                                    <label>Confirmar Nova Password</label>
-                                    <input type="password" name="confirmar_password" required>
-                                </div>
-                                <button type="submit" class="btn-submit">Guardar Nova Password</button>
-                            </form>
+                            <?php require __DIR__ . '/_form_senha.php'; ?>
                         </div>
                     </details>
 
