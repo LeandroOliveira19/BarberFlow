@@ -281,6 +281,66 @@ function teste_pesquisa_agenda(): void {
     ok(str_contains($r['html'], 'Cliente Rotas'), 'barbeiro encontra as suas marcações', $r);
 }
 
+/* ===================== Requisitos web: login robusto, cookie e 2FA ===================== */
+function teste_login_seguro(): void {
+    global $BASE, $pdo;
+    require_once __DIR__ . '/../../../config/totp.php';
+    $limpar = fn() => $pdo->exec("DELETE FROM tentativas_login WHERE email IN ('" . TESTE_GESTOR . "','" . TESTE_BARBEIRO . "')");
+    $limpar();
+
+    // CSRF obrigatório
+    $s = new Sessao($BASE);
+    $r = $s->post('gestao/login.php', ['email' => TESTE_GESTOR, 'password' => TESTE_PASSWORD]);
+    ok($r['status'] === 200 && !str_contains($r['local'], 'index.php'), 'login sem CSRF não entra', $r);
+
+    // Sessão regenerada no login
+    $s = new Sessao($BASE);
+    $s->get('gestao/login.php');
+    $antes = $s->cookie('PHPSESSID');
+    ok($s->login(TESTE_GESTOR) && $antes !== null && $s->cookie('PHPSESSID') !== $antes, 'login certo regenera o id da sessão');
+
+    // Cookie "Lembrar o meu email" (só o email, HttpOnly)
+    $s = new Sessao($BASE);
+    $f = $s->get('gestao/login.php');
+    ok(str_contains($f['html'], 'name="lembrar_email"'), 'login tem a opção "Lembrar o meu email"', $f);
+    $s->post('gestao/login.php', ['email' => TESTE_GESTOR, 'password' => TESTE_PASSWORD, 'lembrar_email' => '1', 'csrf' => Sessao::csrf($f['html'])]);
+    $linha = (string)$s->cookieLinha('bf_email');
+    ok(str_starts_with($linha, '#HttpOnly_') && rawurldecode((string)$s->cookie('bf_email')) === TESTE_GESTOR, 'cookie bf_email HttpOnly com o email');
+    $s->get('gestao/logout.php');
+    $r = $s->get('gestao/login.php');
+    ok(str_contains($r['html'], 'value="' . TESTE_GESTOR . '"'), 'o login seguinte já traz o email', $r);
+    $s->post('gestao/login.php', ['email' => TESTE_GESTOR, 'password' => TESTE_PASSWORD, 'csrf' => Sessao::csrf($r['html'])]);
+    ok($s->cookie('bf_email') === null, 'sem "Lembrar", o cookie é apagado');
+
+    // Limite de tentativas: 5 falhas por email em 15 min
+    $s = new Sessao($BASE);
+    for ($i = 0; $i < 5; $i++) $s->login(TESTE_GESTOR, 'errada-' . $i);
+    ok(!$s->login(TESTE_GESTOR) && str_contains($s->ultima['html'] ?? '', 'Demasiadas tentativas'), '6.º login (mesmo certo) bloqueado com mensagem', $s->ultima);
+    $limpar();
+
+    // 2FA (Review Focus 1): com a senha certa e sem o código não se entra em nada
+    $segredo = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+    $pdo->prepare("UPDATE utilizadores SET totp_segredo = ?, totp_ativo = 1 WHERE email = ?")->execute([$segredo, TESTE_BARBEIRO]);
+    try {
+        $s = new Sessao($BASE);
+        $f = $s->get('gestao/login.php');
+        $r = $s->post('gestao/login.php', ['email' => TESTE_BARBEIRO, 'password' => TESTE_PASSWORD, 'csrf' => Sessao::csrf($f['html'])]);
+        ok($r['status'] === 200 && str_contains($r['html'], 'name="codigo_2fa"'), 'senha certa com 2FA pede o código da app', $r);
+        $r = $s->get('gestao/index.php?m=agenda&a=listar');
+        ok($r['status'] === 302 && str_contains($r['local'], 'login.php'), 'sem o código não abre a gestão', $r);
+        for ($i = 0; $i < 5; $i++) {
+            $f = $s->get('gestao/login.php');
+            $r = $s->post('gestao/login.php', ['codigo_2fa' => '000000', 'csrf' => Sessao::csrf($f['html'])]);
+        }
+        ok(!str_contains($r['html'], 'name="codigo_2fa"') && str_contains($r['html'], 'name="password"'), '5 códigos errados voltam ao passo da senha', $r);
+        $s = new Sessao($BASE);
+        ok($s->login(TESTE_BARBEIRO, TESTE_PASSWORD, totpCodigo($segredo, time())), 'código certo da app entra', $s->ultima);
+    } finally {
+        $pdo->prepare("UPDATE utilizadores SET totp_segredo = NULL, totp_ativo = 0 WHERE email = ?")->execute([TESTE_BARBEIRO]);
+        $limpar();
+    }
+}
+
 /* ===================== Task 5: stock e pedidos ===================== */
 function teste_stock_pedidos(): void {
     global $BASE, $pdo;
@@ -381,7 +441,7 @@ function teste_publico(): void {
 try {
     criarUtilizadoresTeste($pdo);
     foreach (['teste_modular_helpers', 'teste_gestao_base', 'teste_agenda_perfil', 'teste_modulos_gestor',
-              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda'] as $t) {
+              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda', 'teste_login_seguro'] as $t) {
         if (function_exists($t)) { echo "--- $t\n"; $t(); }
     }
 } finally {
