@@ -35,6 +35,22 @@ function enviarEmailBrevo(string $para, string $assunto, string $html): bool {
     return $resp !== false && $status >= 200 && $status < 300;
 }
 
+function enviarConviteEmail(string $para, string $nome, string $nomeBarbearia, string $link): bool {
+    $n = htmlspecialchars($nome, ENT_QUOTES, 'UTF-8');
+    $b = htmlspecialchars($nomeBarbearia, ENT_QUOTES, 'UTF-8');
+    $l = htmlspecialchars($link, ENT_QUOTES, 'UTF-8');
+    return enviarEmailBrevo($para, "Ativa a tua conta — {$nomeBarbearia}", "
+        <div style='font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; border: 1px solid #eee; border-radius: 10px;'>
+            <h2 style='color: #cda47c;'>{$b}</h2>
+            <p>Olá {$n}, foste adicionado à equipa no BarberFlow.</p>
+            <p>Para ativares a conta, abre o link e escolhe a tua senha:</p>
+            <p style='text-align: center; margin: 25px 0;'>
+                <a href='{$l}' style='background: #cda47c; color: #0a0a0a; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: bold;'>Ativar conta</a>
+            </p>
+            <p style='color: #999; font-size: 12px;'>O link é válido durante 48 horas e só pode ser usado uma vez.</p>
+        </div>");
+}
+
 function enviarCodigoSegurancaEmail(string $para, string $nome, string $codigo, string $finalidade): bool {
     $acao = $finalidade === 'recuperar_password' ? 'recuperar a tua senha' : 'mudar a tua senha';
     $n = htmlspecialchars($nome, ENT_QUOTES, 'UTF-8');
