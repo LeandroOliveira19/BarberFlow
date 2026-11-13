@@ -20,3 +20,11 @@ debug_login.php
 teste_api.php
 teste_xampp.php
 explorador.php
+# Ficheiros enviados pelos utilizadores (fotografias dos barbeiros)
+/uploads/
+
+# Ficheiros locais de trabalho (não fazem parte do projeto)
+/seed_demo.php
+/seed_demo.sql
+/RESUMO_BARBERFLOW.md
+/_sandbox_test.txt

@@ -36,14 +36,17 @@ if (!$dataRef || $dataRef->format('Y-m-d') !== $dataStr) {
 
 $filtroEstado   = isset(ESTADOS[$_GET['estado'] ?? '']) ? (string)$_GET['estado'] : '';
 $filtroBarbeiro = $eGestor ? (int)($_GET['barbeiro'] ?? 0) : 0;
+// Pesquisa por nome ou telemóvel do cliente (até 60 caracteres)
+$pesquisa = is_string($_GET['q'] ?? null) ? mb_substr(trim($_GET['q']), 0, 60) : '';
 
 function urlAgenda(array $sobrepor = [], string $acao = 'listar'): string {
-    global $vista, $dataRef, $filtroEstado, $filtroBarbeiro;
+    global $vista, $dataRef, $filtroEstado, $filtroBarbeiro, $pesquisa;
     $p = array_merge([
         'vista'    => $vista,
         'data'     => $dataRef->format('Y-m-d'),
         'estado'   => $filtroEstado,
         'barbeiro' => $filtroBarbeiro ?: '',
+        'q'        => $pesquisa,
     ], $sobrepor);
     return urlModulo('agenda', $acao, array_filter($p, fn($v) => $v !== '' && $v !== null));
 }

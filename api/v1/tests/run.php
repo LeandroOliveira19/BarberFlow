@@ -293,7 +293,7 @@ function teste_verificar(): void {
 
     $r = acao($m['id'], 'verificar', ['codigo' => $novo]);
     verifica($r['status'] === 200 && ($r['json']['estado'] ?? '') === 'confirmada', 'código certo confirma', $r);
-    verifica(preg_match('/^[0-9a-f]{64}$/', (string)($r['json']['token'] ?? '')) === 1, 'token hex de 64', $r);
+    verifica(preg_match('/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/', (string)($r['json']['token'] ?? '')) === 1, 'token devolvido é um JWT', $r);
     $GLOBALS['token'] = (string)($r['json']['token'] ?? '');
 
     // Review Focus 5: nunca confirmar duas vezes
@@ -333,6 +333,14 @@ function teste_listar(): void {
     verifica(preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', (string)($m['inicio'] ?? '')) === 1, 'inicio formatado', $r);
     verifica(!array_key_exists('email', $m) && !array_key_exists('cliente_id', $m), 'sem dados do cliente', $r);
     verifica(array_key_exists('para_nome', $m) && $m['para_nome'] === null, 'lista inclui para_nome (null = para quem marcou)', $r);
+
+    // Requisitos web: o token devolvido é um JWT, e o formato antigo (apps já instaladas) continua aceite
+    verifica(count(explode('.', $tok)) === 3, 'o token da marcação é um JWT (3 partes)');
+    require_once __DIR__ . '/../_lib.php';
+    $antigo = function_exists('tokenMarcacaoAntigo') ? tokenMarcacaoAntigo($id, (int)($m['cliente_id'] ?? clienteDaMarcacao($id))) : '';
+    $GLOBALS['token_antigo'] = $antigo;
+    $r = pedido('GET', 'marcacoes', null, ['tokens' => "$id:$antigo"]);
+    verifica(count((array)$r['json']) === 1, 'token antigo (HMAC) continua a listar', $r);
 
     // Review Focus 4: token adulterado ou usado com outro id não revela nada
     $adulterado = substr($tok, 0, -1) . ($tok[-1] === 'a' ? 'b' : 'a');
@@ -415,6 +423,12 @@ function remarcarEnquantoOutroSeguraOBarbeiro(int $id, string $tok, int $barbeir
     curl_multi_remove_handle($mh, $ch);
     curl_multi_close($mh);
     return [$semDeadlock, $resp];
+}
+
+function clienteDaMarcacao(int $id): int {
+    $st = bdTeste()->prepare("SELECT cliente_id FROM marcacoes WHERE id = ?");
+    $st->execute([$id]);
+    return (int)$st->fetchColumn();
 }
 
 function notasMarcacao(int $id): string {
@@ -505,6 +519,12 @@ function teste_alterar(): void {
     verifica(str_contains(notasMarcacao($id), 'Cancelada pelo cliente na app'), 'notas com o rasto do cancelamento');
     $r = pedido('POST', "marcacoes/$id/cancelar", ['token' => $tok]);
     verifica($r['status'] === 409 && ($r['json']['erro']['codigo'] ?? '') === 'estado_invalido', 'cancelar de novo 409 estado_invalido', $r);
+    // Token antigo (apps já instaladas) é aceite no cancelar: chega à regra do estado (409) e não dá 404
+    $r = pedido('POST', "marcacoes/$id/cancelar", ['token' => (string)($GLOBALS['token_antigo'] ?? '')]);
+    verifica($r['status'] === 409 && ($r['json']['erro']['codigo'] ?? '') === 'estado_invalido', 'cancelar com token antigo é aceite (409, não 404)', $r);
+    // JWT válido mas de outra marcação → 404
+    $r = pedido('POST', "marcacoes/$b/cancelar", ['token' => $tok]);
+    verifica($r['status'] === 404, 'JWT de outra marcação 404', $r);
 }
 
 /** Parte só-leitura (segura para correr na UA). */
@@ -534,6 +554,41 @@ function limpar_dados_teste(): void {
 }
 
 /* ===================== Revisão final #2: segredo ===================== */
+/* ===================== Requisitos web: JWT (HS256) ===================== */
+function b64url(string $s): string { return rtrim(strtr(base64_encode($s), '+/', '-_'), '='); }
+
+function teste_jwt(): void {
+    $f = __DIR__ . '/../../../config/jwt.php';
+    if (!is_file($f)) { verifica(false, 'config/jwt.php existe'); return; }
+    require_once $f;
+    $seg = str_repeat('ab', 32);
+    $jwt = jwtCriar(['sub' => 7, 'cli' => 9, 'iat' => 1700000000], $seg);
+    verifica(count(explode('.', $jwt)) === 3, 'JWT tem 3 partes');
+    verifica(jwtValidar($jwt, $seg) === ['sub' => 7, 'cli' => 9, 'iat' => 1700000000], 'criar e validar dá ida e volta');
+    [$h, $p, $s] = explode('.', $jwt);
+    verifica(json_decode(base64_decode(strtr($h, '-_', '+/')), true) === ['alg' => 'HS256', 'typ' => 'JWT'], 'cabeçalho HS256/JWT');
+
+    // Review Focus 2: tokens forjados
+    $semAlg = b64url('{"alg":"none","typ":"JWT"}') . '.' . $p . '.';
+    verifica(jwtValidar($semAlg, $seg) === null, 'alg none recusado');
+    $hs512 = b64url('{"alg":"HS512","typ":"JWT"}') . '.' . $p;
+    $hs512 .= '.' . b64url(hash_hmac('sha512', $hs512, $seg, true));
+    verifica(jwtValidar($hs512, $seg) === null, 'alg HS512 recusado');
+    verifica(jwtValidar(jwtCriar(['sub' => 7], str_repeat('cd', 32)), $seg) === null, 'assinatura com outro segredo recusada');
+    $alterado = $h . '.' . b64url('{"sub":8,"cli":9,"iat":1700000000}') . '.' . $s;
+    verifica(jwtValidar($alterado, $seg) === null, 'payload alterado recusado');
+    // Revisão final I1: o último carácter da assinatura só usa 2 bits; nenhuma outra letra pode passar
+    $aceites = 0;
+    foreach (str_split('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_') as $c) {
+        if ($c === $s[-1]) continue;
+        if (jwtValidar($h . '.' . $p . '.' . substr($s, 0, -1) . $c, $seg) !== null) $aceites++;
+    }
+    verifica($aceites === 0, "nenhuma assinatura com o último carácter trocado é aceite ($aceites aceites)");
+    foreach (['', 'a.b', 'a.b.c.d', '!!!.###.$$$', $h . '.' . $p . '.'] as $mau) {
+        verifica(jwtValidar($mau, $seg) === null, 'JWT mal formado recusado: "' . substr($mau, 0, 12) . '"');
+    }
+}
+
 function teste_segredo(): void {
     require_once __DIR__ . '/../_lib.php';
     verifica(function_exists('segredoValido') && segredoValido(str_repeat('ab', 32)), 'segredo de 64 hex aceite');
@@ -567,7 +622,7 @@ function teste_sempre_json(): void {
 }
 
 /* ===================== Execução ===================== */
-$leitura = ['teste_segredo', 'teste_politica_codigo','teste_barbearia','teste_catalogo', 'teste_disponibilidade', 'teste_sempre_json'];
+$leitura = ['teste_jwt', 'teste_segredo', 'teste_politica_codigo','teste_barbearia','teste_catalogo', 'teste_disponibilidade', 'teste_sempre_json'];
 $escrita = ['teste_criar_marcacao', 'teste_verificar', 'teste_listar', 'teste_alterar'];
 
 foreach ($leitura as $t) { if (function_exists($t)) { echo "--- $t\n"; $t(); } }

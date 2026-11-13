@@ -52,6 +52,17 @@ $bancadas_livres = $stmt->fetchAll();
     <?php if ($msg): ?><div class="alerta sucesso"><?= $msg ?></div><?php endif; ?>
     <?php if ($nova_pass_info): ?><div class="alerta sucesso"><?= $nova_pass_info ?></div><?php endif; ?>
 
+    <?php if (!empty($_SESSION['convite_link'])): $cv = $_SESSION['convite_link']; unset($_SESSION['convite_link']); ?>
+        <!-- Link de ativação (quando o email não saiu ou em desenvolvimento): o gestor copia e envia ao barbeiro -->
+        <div class="alerta" style="border:1px solid var(--gold); background:rgba(205,164,124,0.08); margin-bottom:1.5rem;">
+            <strong>Link de ativação de <?= e($cv['nome']) ?></strong> (válido 48 h, só serve uma vez):
+            <div style="display:flex; gap:0.5rem; margin-top:0.6rem;">
+                <input id="linkConvite" type="text" readonly value="<?= e($cv['link']) ?>" style="flex:1; background:#1a1a1a; color:#fff; border:1px solid var(--border); border-radius:6px; padding:0.5rem;">
+                <button type="button" class="btn-acao" onclick="navigator.clipboard.writeText(document.getElementById('linkConvite').value).then(() => this.textContent = 'Copiado ✓')">Copiar</button>
+            </div>
+        </div>
+    <?php endif; ?>
+
     <div class="grid" style="display:grid; grid-template-columns: 2fr 1fr; gap:2rem;">
         <!-- Tabela de Barbeiros -->
         <div class="table-container">
@@ -75,12 +86,23 @@ $bancadas_livres = $stmt->fetchAll();
                             </td>
                             <td><?= htmlspecialchars($b['bancada_nome'] ?? '-') ?></td>
                             <td>
-                                <span class="badge <?= $b['ativo'] ? 'ok' : 'low' ?>">
-                                    <?= $b['ativo'] ? 'Ativo' : 'Inativo' ?>
-                                </span>
+                                <?php if ($b['ativo'] && !empty($b['convite_token_hash'])): ?>
+                                    <span class="badge" style="color:var(--gold); background:rgba(205,164,124,0.15);">Por ativar</span>
+                                <?php else: ?>
+                                    <span class="badge <?= $b['ativo'] ? 'ok' : 'low' ?>">
+                                        <?= $b['ativo'] ? 'Ativo' : 'Inativo' ?>
+                                    </span>
+                                <?php endif; ?>
                             </td>
                             <td>
                                 <a href="<?= e(urlModulo('barbeiros', 'listar', ['editar' => $b['id']])) ?>" class="btn-acao">Editar</a>
+                                <?php if ($b['ativo'] && !empty($b['convite_token_hash'])): ?>
+                                    <form method="POST" action="<?= e(urlModulo('barbeiros', 'reenviar_convite')) ?>" style="display:inline;">
+                                        <?= campoCsrf() ?>
+                                        <input type="hidden" name="id" value="<?= (int)$b['id'] ?>">
+                                        <button type="submit" class="btn-acao">Reenviar convite</button>
+                                    </form>
+                                <?php endif; ?>
                                 <?php if ($b['ativo']): ?>
                                     <form method="POST" action="<?= e(urlModulo('barbeiros', 'apagar')) ?>" style="display:inline;">
                                         <?= campoCsrf() ?>
@@ -105,11 +127,11 @@ $bancadas_livres = $stmt->fetchAll();
         <div class="form-card" style="background:var(--card); padding:1.5rem; border-radius:12px; border:1px solid var(--border);">
             <h2 style="color:var(--gold); margin-bottom:1.5rem;"><?= $editar ? 'Editar Barbeiro' : 'Adicionar Barbeiro' ?></h2>
             
-            <?php if (!$editar && empty($bancadas_livres)): ?>
-                <div class="alerta erro">
-                    Não existem bancadas livres. Vai à Gestão de Bancadas para criar ou libertar uma.
-                </div>
-            <?php else: ?>
+            <?php if (!$editar): ?>
+                <p style="color:var(--muted); font-size:0.85rem; margin-bottom:1rem;">
+                    O barbeiro recebe por email um link para ativar a conta e escolher a própria senha.
+                </p>
+            <?php endif; ?>
                 <form method="POST" action="<?= e(urlModulo('barbeiros', $editar ? 'editar' : 'criar')) ?>">
                     <?= campoCsrf() ?>
                     <?php if ($editar): ?><input type="hidden" name="id" value="<?= $editar['id'] ?>"><?php endif; ?>
@@ -129,9 +151,9 @@ $bancadas_livres = $stmt->fetchAll();
                         <input type="tel" name="telefone" value="<?= htmlspecialchars($editar['telefone'] ?? '') ?>">
                     </div>
                     <div class="input-group">
-                        <label>Atribuir Bancada *</label>
-                        <select name="bancada_id" required>
-                            <option value="">Escolhe uma bancada...</option>
+                        <label>Atribuir Bancada <span style="color:var(--muted);">(opcional)</span></label>
+                        <select name="bancada_id">
+                            <option value=""><?= empty($bancadas_livres) ? 'Sem bancadas livres (atribuir depois)' : 'Sem bancada (atribuir depois)' ?></option>
                             <?php foreach ($bancadas_livres as $bl): ?>
                                 <option value="<?= $bl['id'] ?>" <?= ($editar['bancada_id'] ?? '') == $bl['id'] ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($bl['nome']) ?>
@@ -139,12 +161,11 @@ $bancadas_livres = $stmt->fetchAll();
                             <?php endforeach; ?>
                         </select>
                     </div>
-                    <button type="submit" class="btn-submit"><?= $editar ? 'Guardar Alterações' : 'Criar Conta' ?></button>
+                    <button type="submit" class="btn-submit"><?= $editar ? 'Guardar Alterações' : 'Enviar convite' ?></button>
                     <?php if ($editar): ?>
                         <a href="<?= e(urlModulo('barbeiros', 'listar')) ?>" style="display:block; text-align:center; margin-top:1rem; color:var(--muted);">Cancelar</a>
                     <?php endif; ?>
                 </form>
-            <?php endif; ?>
         </div>
     </div>
 </div>

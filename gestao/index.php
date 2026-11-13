@@ -24,7 +24,8 @@ spl_autoload_register(function (string $classe): void {
 });
 ini_set('display_errors', '0');
 
-session_start();
+require_once __DIR__ . '/../config/sessao.php';
+iniciarSessaoSegura();
 
 /* ---------- 1. Sessão ---------- */
 if (!isset($_SESSION['utilizador_id'], $_SESSION['barbearia_id'], $_SESSION['tipo'])) {
@@ -42,9 +43,9 @@ $MODULOS = [
     'gestor' => [
         'dashboard' => ['ver'],
         'agenda'    => ['listar', 'estado'],
-        'perfil'    => ['editar', 'guardar', 'alterar_password'],
+        'perfil'    => ['editar', 'guardar', 'alterar_password', 'enviar_codigo', 'ativar_dois_fatores', 'desativar_dois_fatores'],
         'servicos'     => ['listar', 'guardar', 'apagar'],
-        'barbeiros'    => ['listar', 'criar', 'editar', 'apagar', 'ativar'],
+        'barbeiros'    => ['listar', 'criar', 'editar', 'apagar', 'ativar', 'reenviar_convite'],
         'bancadas'     => ['listar', 'criar', 'editar', 'apagar', 'ativar'],
         'fornecedores' => ['listar', 'guardar'],
         'definicoes'   => ['editar', 'guardar'],
@@ -54,7 +55,7 @@ $MODULOS = [
     'barbeiro' => [
         'dashboard' => ['ver'],
         'agenda'    => ['listar', 'estado'],
-        'perfil'    => ['editar', 'guardar', 'alterar_password'],
+        'perfil'    => ['editar', 'guardar', 'alterar_password', 'enviar_codigo', 'ativar_dois_fatores', 'desativar_dois_fatores'],
         'stock'     => ['listar', 'pedir_reposicao'],   // a sua bancada
     ],
 ];

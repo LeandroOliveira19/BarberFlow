@@ -13,6 +13,12 @@ $forcar_alteracao = isset($_GET['force']) || (($_SESSION['precisa_alterar_passwo
 $stmt = $pdo->prepare("SELECT * FROM utilizadores WHERE id = ?");
 $stmt->execute([$uid]);
 $user = $stmt->fetch();
+
+// 2FA: enquanto não estiver ativo, o segredo novo fica só na sessão (é gravado ao confirmar com um código)
+require_once __DIR__ . '/../../../config/totp.php';
+$tem2fa = !empty($user['totp_ativo']);
+if (!$tem2fa && empty($_SESSION['totp_pendente'])) $_SESSION['totp_pendente'] = totpGerarSegredo();
+$segredo2fa = $tem2fa ? '' : (string)$_SESSION['totp_pendente'];
 ?>
 
 <style>
@@ -73,18 +79,7 @@ $user = $stmt->fetch();
             <?php if ($forcar_alteracao): ?>
                 <div class="form-section">
                     <h3>Alterar Password (Obrigatório)</h3>
-                    <form method="POST" action="<?= e(urlModulo('perfil', 'alterar_password')) ?>">
-                        <?= campoCsrf() ?>
-                        <div class="input-group">
-                            <label>Nova Password</label>
-                            <input type="password" name="nova_password" required placeholder="Mínimo 6 caracteres">
-                        </div>
-                        <div class="input-group">
-                            <label>Confirmar Nova Password</label>
-                            <input type="password" name="confirmar_password" required placeholder="Repete a password">
-                        </div>
-                        <button type="submit" class="btn-submit">Guardar Nova Password</button>
-                    </form>
+                    <?php require __DIR__ . '/_form_senha.php'; ?>
                 </div>
             <?php else: ?>
                 <div class="form-section">
@@ -129,18 +124,57 @@ $user = $stmt->fetch();
                     <details class="password-toggle">
                         <summary>Alterar a minha Password</summary>
                         <div class="details-content">
-                            <form method="POST" action="<?= e(urlModulo('perfil', 'alterar_password')) ?>">
-                                <?= campoCsrf() ?>
-                                <div class="input-group">
-                                    <label>Nova Password</label>
-                                    <input type="password" name="nova_password" required>
-                                </div>
-                                <div class="input-group">
-                                    <label>Confirmar Nova Password</label>
-                                    <input type="password" name="confirmar_password" required>
-                                </div>
-                                <button type="submit" class="btn-submit">Guardar Nova Password</button>
-                            </form>
+                            <?php require __DIR__ . '/_form_senha.php'; ?>
+                        </div>
+                    </details>
+
+                    <details class="password-toggle">
+                        <summary><?= $tem2fa ? 'Desativar 2FA (verificação em dois passos)' : 'Ativar 2FA (verificação em dois passos)' ?></summary>
+                        <div class="details-content">
+                            <?php if ($tem2fa): ?>
+                                <p style="color: #4ade80; margin-bottom: 1rem;">✅ O login pede o código da tua app autenticadora.</p>
+                                <form method="POST" action="<?= e(urlModulo('perfil', 'desativar_dois_fatores')) ?>">
+                                    <?= campoCsrf() ?>
+                                    <div class="input-group">
+                                        <label>A tua password</label>
+                                        <input type="password" name="password" required autocomplete="current-password">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Código atual da app</label>
+                                        <input type="text" name="codigo" inputmode="numeric" pattern="\d{6}" maxlength="6" required autocomplete="one-time-code">
+                                    </div>
+                                    <button type="submit" class="btn-submit">Desativar 2FA</button>
+                                </form>
+                            <?php else: ?>
+                                <p style="color: var(--muted); margin-bottom: 1rem;">
+                                    1. Instala uma app autenticadora (Google Authenticator, Microsoft Authenticator…).<br>
+                                    2. Lê este QR code com a app (ou escreve a chave à mão).<br>
+                                    3. Escreve o código de 6 dígitos que a app mostra.
+                                </p>
+                                <div id="qr2fa" style="background:#fff; display:inline-block; padding:8px; border-radius:8px; margin-bottom:1rem;"
+                                     data-uri="<?= e(totpUri($segredo2fa, (string)$user['email'])) ?>"></div>
+                                <p style="margin-bottom: 1rem;">Chave: <code id="chave2fa" style="letter-spacing: 0.1em; user-select: all;"><?= e($segredo2fa) ?></code></p>
+                                <form method="POST" action="<?= e(urlModulo('perfil', 'ativar_dois_fatores')) ?>">
+                                    <?= campoCsrf() ?>
+                                    <div class="input-group">
+                                        <label>Código da app</label>
+                                        <input type="text" name="codigo" inputmode="numeric" pattern="\d{6}" maxlength="6" required autocomplete="one-time-code">
+                                    </div>
+                                    <button type="submit" class="btn-submit">Ativar 2FA</button>
+                                </form>
+                                <!-- Biblioteca só de desenho do QR (qrcode-generator, MIT), guardada no projeto -->
+                                <script src="../assets/js/qrcode.js"></script>
+                                <script>
+                                    (function () {
+                                        var alvo = document.getElementById('qr2fa');
+                                        if (!alvo || typeof qrcode !== 'function') return;
+                                        var qr = qrcode(0, 'M');
+                                        qr.addData(alvo.getAttribute('data-uri'));
+                                        qr.make();
+                                        alvo.innerHTML = qr.createSvgTag(4, 0);
+                                    })();
+                                </script>
+                            <?php endif; ?>
                         </div>
                     </details>
                 </div>
