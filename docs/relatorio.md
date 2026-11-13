@@ -132,7 +132,7 @@ Correm com o servidor local ligado (`php -S 127.0.0.1:8080 -t C:\xampp\htdocs`).
 ## 9. Instalação
 
 1. Copiar o projeto para o servidor PHP (ex.: `htdocs` do XAMPP).
-2. Importar o dump da BD `esan-dsg09` (não está no repositório, porque tem dados reais) e correr, por ordem, `movimentos_stock.sql` e os ficheiros de `sql/` (§2).
+2. Importar o dump da BD `esan-dsg09` (não está no repositório, porque tem dados reais) e correr os ficheiros de `sql/` por ordem de data (§2).
 3. Em `config/`, copiar `credenciais.example.php` para `credenciais.php` e preencher a BD, o `api_segredo` (`bin2hex(random_bytes(32))`) e a chave do Brevo.
    - Num servidor sem email (UA): `'api_codigo_se_email_falhar' => true`.
    - Em produção: as duas opções de código no ecrã desligadas.

@@ -205,7 +205,7 @@ Os JOIN incluem `barbearia_id` como segunda proteção multi-tenant. A consulta 
 | Ficheiro | O que faz |
 |---|---|
 | Dump inicial `esan-dsg09` | Estrutura e dados de base. **Não está no repositório**, porque tem dados reais; a BD da UA já o tem |
-| `movimentos_stock.sql` | Tabela de auditoria do stock |
+| `sql/2026-11-10_movimentos_stock.sql` | Tabela de auditoria do stock |
 | `sql/2026-11-11_marcacoes_para_nome.sql` | Coluna `marcacoes.para_nome` |
 | `sql/2026-11-13_seguranca_contas.sql` | Convites, 2FA, `codigos_seguranca`, `tentativas_login` e `vw_agenda` (pode repetir-se) |
 | `sql/utilizadores_teste.sql` | Contas de teste para a avaliação (na barbearia de demonstração) |
