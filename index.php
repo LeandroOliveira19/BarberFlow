@@ -18,7 +18,8 @@ require_once __DIR__ . '/config/marcacoes.php';   // utilitários e regras (e(),
 require_once __DIR__ . '/config/modular.php';
 ini_set('display_errors', '0');
 
-session_start();
+require_once __DIR__ . '/config/sessao.php';
+iniciarSessaoSegura();
 tokenCsrf();
 
 /** Módulos e ações da parte pública (lista branca). A 1.ª ação é a de omissão. */

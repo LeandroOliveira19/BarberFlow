@@ -25,34 +25,36 @@ if ($vista === 'dia') {
     $tituloIntervalo = 'Próximos 90 dias';
 }
 
+// Vista vw_agenda (sql/2026-11-13_seguranca_contas.sql): marcação + cliente + serviço + barbeiro
 $sql = "
-    SELECT m.id, m.inicio, m.fim, m.estado,
-           c.nome AS cliente_nome, c.telemovel AS cliente_telemovel, c.email AS cliente_email, m.notas, m.para_nome,
-           s.nome AS servico_nome, s.preco AS servico_preco,
-           u.nome AS barbeiro_nome
-    FROM marcacoes m
-    JOIN clientes    c ON c.id = m.cliente_id  AND c.barbearia_id = m.barbearia_id
-    JOIN servicos    s ON s.id = m.servico_id  AND s.barbearia_id = m.barbearia_id
-    JOIN utilizadores u ON u.id = m.barbeiro_id AND u.barbearia_id = m.barbearia_id
-    WHERE m.barbearia_id = ?
-      AND m.inicio >= ? AND m.inicio < ?
+    SELECT v.id, v.inicio, v.fim, v.estado,
+           v.cliente_nome, v.cliente_telemovel, v.cliente_email, v.notas, v.para_nome,
+           v.servico_nome, v.servico_preco, v.barbeiro_nome
+    FROM vw_agenda v
+    WHERE v.barbearia_id = ?
+      AND v.inicio >= ? AND v.inicio < ?
 ";
 $params = [$bid, $de->format('Y-m-d H:i:s'), $ate->format('Y-m-d H:i:s')];
 
 if (!$eGestor) {
-    $sql .= " AND m.barbeiro_id = ?";
+    $sql .= " AND v.barbeiro_id = ?";
     $params[] = $uid;
 } elseif ($filtroBarbeiro > 0) {
-    $sql .= " AND m.barbeiro_id = ?";
+    $sql .= " AND v.barbeiro_id = ?";
     $params[] = $filtroBarbeiro;
 }
 if ($filtroEstado !== '') {
-    $sql .= " AND m.estado = ?";
+    $sql .= " AND v.estado = ?";
     $params[] = $filtroEstado;
 } else {
-    $sql .= " AND m.estado <> 'expirada'";
+    $sql .= " AND v.estado <> 'expirada'";
 }
-$sql .= " ORDER BY m.inicio ASC LIMIT 500";
+if ($pesquisa !== '') {
+    $sql .= " AND (v.cliente_nome LIKE ? ESCAPE '\\\\' OR v.cliente_telemovel LIKE ? ESCAPE '\\\\')";
+    $params[] = likeSeguro($pesquisa);
+    $params[] = likeSeguro($pesquisa);
+}
+$sql .= " ORDER BY v.inicio ASC LIMIT 500";
 
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
@@ -167,6 +169,7 @@ $slug = (string)$sl->fetchColumn();
                 <?php endforeach; ?>
             </select>
             <?php endif; ?>
+            <input type="search" name="q" value="<?= e($pesquisa) ?>" maxlength="60" placeholder="Pesquisar cliente (nome ou telemóvel)" aria-label="Pesquisar cliente">
             <button type="submit">Filtrar</button>
         </form>
     </div>

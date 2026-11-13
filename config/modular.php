@@ -67,3 +67,8 @@ function redirecionar(string $url): never {
     header('Location: ' . $url);
     exit;
 }
+
+/** Texto para LIKE ... ESCAPE '\\': o que o utilizador escreve é procurado como texto (% e _ não são curingas). */
+function likeSeguro(string $texto): string {
+    return '%' . addcslashes($texto, '\\%_') . '%';
+}

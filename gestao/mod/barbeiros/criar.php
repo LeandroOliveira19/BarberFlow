@@ -1,63 +1,48 @@
 <?php
 declare(strict_types=1);
-// Módulo: barbeiros / criar — (POST) O CSRF e o perfil já foram validados pelo gestao/index.php.
+// Módulo: barbeiros / criar (POST) — convida um barbeiro: a conta fica "por ativar" até ele escolher a senha
+// pelo link recebido por email (gestao/ativar.php). O CSRF e o perfil já foram validados pelo gestao/index.php.
 if (count(get_included_files()) === 1) { header('Location: ../../index.php'); exit; }
-
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirecionar(urlModulo('barbeiros', 'listar'));
 
-$msg = '';
-$erro = '';
-$nova_pass_info = '';
-    $id = (int)($_POST['id'] ?? 0);
+require_once __DIR__ . '/../../../config/contas.php';
+require_once __DIR__ . '/_convite.php';
 
-        $nome = trim($_POST['nome'] ?? '');
-        $email = trim($_POST['email'] ?? '');
-        $telefone = trim($_POST['telefone'] ?? '');
-        $bancada_id = !empty($_POST['bancada_id']) ? (int)$_POST['bancada_id'] : null;
+$nome       = trim((string)($_POST['nome'] ?? ''));
+$email      = trim((string)($_POST['email'] ?? ''));
+$telefone   = trim((string)($_POST['telefone'] ?? ''));
+$bancada_id = !empty($_POST['bancada_id']) ? (int)$_POST['bancada_id'] : null;   // opcional: pode atribuir-se depois
 
-        if ($nome && filter_var($email, FILTER_VALIDATE_EMAIL) && $bancada_id) {
-            // Verificar se email já existe
-            $stmt = $pdo->prepare("SELECT id FROM utilizadores WHERE email = ?");
-            $stmt->execute([$email]);
-            if ($stmt->fetch()) {
-                $erro = 'Este email já está registado.';
-            } else {
-                // Gerar password temporária
-                $temp_pass = substr(str_shuffle("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"), 0, 8);
-                $hash = password_hash($temp_pass, PASSWORD_DEFAULT);
+if ($nome === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    flash('erro', 'Indica o nome e um email válido.');
+    redirecionar(urlModulo('barbeiros', 'listar'));
+}
+$st = $pdo->prepare("SELECT id FROM utilizadores WHERE email = ?");
+$st->execute([$email]);
+if ($st->fetch()) {
+    flash('erro', 'Este email já está registado.');
+    redirecionar(urlModulo('barbeiros', 'listar'));
+}
 
-                $pdo->beginTransaction();
-                try {
-                    // Inserir utilizador
-                    $stmt = $pdo->prepare("INSERT INTO utilizadores (barbearia_id, nome, email, password_hash, telefone, tipo, precisa_alterar_password) VALUES (?, ?, ?, ?, ?, 'barbeiro', 1)");
-                    $stmt->execute([$bid, $nome, $email, $hash, $telefone]);
-                    $novo_id = $pdo->lastInsertId();
+$pdo->beginTransaction();
+try {
+    // Senha aleatória que ninguém conhece: só o link do convite permite escolher a verdadeira
+    $pdo->prepare("INSERT INTO utilizadores (barbearia_id, nome, email, password_hash, telefone, tipo, precisa_alterar_password)
+                   VALUES (?, ?, ?, ?, ?, 'barbeiro', 0)")
+        ->execute([$bid, $nome, $email, password_hash(bin2hex(random_bytes(32)), PASSWORD_DEFAULT), $telefone !== '' ? $telefone : null]);
+    $novoId = (int)$pdo->lastInsertId();
+    if ($bancada_id) {
+        $pdo->prepare("UPDATE bancadas SET barbeiro_id = ? WHERE id = ? AND barbearia_id = ? AND barbeiro_id IS NULL")
+            ->execute([$novoId, $bancada_id, $bid]);
+    }
+    $token = criarConvite($pdo, $novoId);
+    $pdo->commit();
+} catch (Throwable $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    error_log('[barbeiros/criar] ' . $e->getMessage());
+    flash('erro', 'Não foi possível criar o barbeiro. Tenta de novo.');
+    redirecionar(urlModulo('barbeiros', 'listar'));
+}
 
-                    // Atribuir a bancada
-                    $stmt = $pdo->prepare("UPDATE bancadas SET barbeiro_id = ? WHERE id = ? AND barbearia_id = ? AND barbeiro_id IS NULL");
-                    $stmt->execute([$novo_id, $bancada_id, $bid]);
-
-                    $pdo->commit();
-
-                    // Tentar enviar email
-                    $email_enviado = enviarCredenciaisEmail($email, $nome, $temp_pass);
-
-                    if ($email_enviado) {
-                        $nova_pass_info = "Barbeiro criado com sucesso! O email com as credenciais foi enviado para <strong>{$email}</strong>.";
-                    } else {
-                        $nova_pass_info = "Barbeiro criado com sucesso! (Aviso: O envio do email falhou). Password temporária: <strong>" . $temp_pass . "</strong> (Entrega esta password ao barbeiro).";
-                    }
-
-                } catch (Exception $e) {
-                    $pdo->rollBack();
-                    $erro = 'Erro ao criar o barbeiro: ' . $e->getMessage();
-                }
-            }
-        } else {
-            $erro = 'Preenche todos os campos obrigatórios.';
-        }
-
-if ($erro) flash('erro', $erro);
-if ($nova_pass_info) flash('sucesso', strip_tags($nova_pass_info));
-if ($msg) flash('sucesso', $msg);
+enviarConviteEAvisar($pdo, $bid, $nome, $email, $token);
 redirecionar(urlModulo('barbeiros', 'listar'));

@@ -83,9 +83,28 @@ function segredoApi(): string {
     return $s;
 }
 
-/** Token de acesso a uma marcação confirmada: HMAC do id + cliente (sem guardar nada na BD). */
+/**
+ * Token de acesso a uma marcação confirmada: JWT HS256 {sub: marcação, cli: cliente, iat} (config/jwt.php),
+ * assinado com o api_segredo. Não se guarda nada na BD: a assinatura prova que foi o servidor a emiti-lo.
+ */
 function tokenMarcacao(int $marcacaoId, int $clienteId): string {
+    require_once __DIR__ . '/../../config/jwt.php';
+    return jwtCriar(['sub' => $marcacaoId, 'cli' => $clienteId, 'iat' => time()], segredoApi());
+}
+
+/** Formato antigo (HMAC hex): ainda guardado pelas apps instaladas antes do JWT. */
+function tokenMarcacaoAntigo(int $marcacaoId, int $clienteId): string {
     return hash_hmac('sha256', $marcacaoId . '|' . $clienteId, segredoApi());
+}
+
+/** Aceita o JWT (sub e cli têm de ser os da marcação) ou o token antigo. */
+function tokenMarcacaoValido(string $tok, int $marcacaoId, int $clienteId): bool {
+    if (str_contains($tok, '.')) {
+        require_once __DIR__ . '/../../config/jwt.php';
+        $p = jwtValidar($tok, segredoApi());
+        return $p !== null && ($p['sub'] ?? null) === $marcacaoId && ($p['cli'] ?? null) === $clienteId;
+    }
+    return hash_equals(tokenMarcacaoAntigo($marcacaoId, $clienteId), $tok);
 }
 
 /** Token que prova ser quem criou a marcação (exigido para verificar/reenviar o código). */
@@ -101,16 +120,8 @@ function exigirTokenPendente(array $m, array $corpo): void {
     }
 }
 
-/**
- * Decide se a resposta pode incluir o código de confirmação (campo codigo_dev):
- *  - sempre, em desenvolvimento local ('api_dev_devolver_codigo' => true);
- *  - só quando o email falhou, se 'api_codigo_se_email_falhar' => true
- *    (servidor da UA: não deixa sair pedidos para o Brevo, por isso o email nunca chega).
- */
-function deveDevolverCodigo(array $cred, bool $emailEnviado): bool {
-    if (($cred['api_dev_devolver_codigo'] ?? false) === true) return true;
-    return !$emailEnviado && ($cred['api_codigo_se_email_falhar'] ?? false) === true;
-}
+// deveDevolverCodigo(): quando o código pode ir na resposta (codigo_dev). Partilhado com a gestão.
+require_once __DIR__ . '/../../config/politica_codigo.php';
 
 /** URL base do site (até à pasta que contém api/), ex.: http://host/projeto/projeto/ */
 function urlBaseSite(): string {
