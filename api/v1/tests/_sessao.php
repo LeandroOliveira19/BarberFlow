@@ -44,9 +44,32 @@ final class Sessao {
         return ['status' => $status, 'html' => substr($resp, $tamCab), 'local' => trim($m[1] ?? '')];
     }
 
-    public function login(string $email, string $password = TESTE_PASSWORD): bool {
-        $r = $this->post('gestao/login.php', ['email' => $email, 'password' => $password]);
+    /** Login como no browser: lê o CSRF do formulário; se a conta tiver 2FA, envia $codigo2fa no 2.º passo. */
+    public function login(string $email, string $password = TESTE_PASSWORD, ?string $codigo2fa = null): bool {
+        $f = $this->get('gestao/login.php');
+        $r = $this->post('gestao/login.php', ['email' => $email, 'password' => $password, 'csrf' => self::csrf($f['html'])]);
+        if ($r['status'] === 200 && str_contains($r['html'], 'name="codigo_2fa"') && $codigo2fa !== null) {
+            $r = $this->post('gestao/login.php', ['codigo_2fa' => $codigo2fa, 'csrf' => self::csrf($r['html'])]);
+        }
+        $this->ultima = $r;
         return $r['status'] === 302 && str_contains($r['local'], 'index.php');
+    }
+
+    /** Última resposta do login() (para os testes verem a mensagem de erro). */
+    public array $ultima = [];
+
+    /** Linha do cookie no ficheiro de cookies do curl (formato Netscape; "#HttpOnly_" no início = HttpOnly). */
+    public function cookieLinha(string $nome): ?string {
+        foreach (@file($this->jar) ?: [] as $linha) {
+            $campos = explode("\t", rtrim($linha, "\r\n"));
+            if (count($campos) === 7 && $campos[5] === $nome) return $linha;
+        }
+        return null;
+    }
+
+    public function cookie(string $nome): ?string {
+        $l = $this->cookieLinha($nome);
+        return $l === null ? null : explode("\t", rtrim($l, "\r\n"))[6];
     }
 
     /** Lê o token CSRF de um formulário da página. */
@@ -76,6 +99,9 @@ function criarUtilizadoresTeste(PDO $pdo): array {
 }
 
 function apagarUtilizadoresTeste(PDO $pdo): void {
+    try {   // tentativas de login dos testes (a tabela pode ainda não existir antes da migração)
+        $pdo->exec("DELETE FROM tentativas_login WHERE email LIKE '%teste%@example.com' OR email LIKE '%rotas%@example.com'");
+    } catch (PDOException) {}
     $ids = $pdo->query("SELECT id FROM utilizadores WHERE email IN ('" . TESTE_GESTOR . "','" . TESTE_BARBEIRO . "')")
                ->fetchAll(PDO::FETCH_COLUMN);
     if (!$ids) return;
