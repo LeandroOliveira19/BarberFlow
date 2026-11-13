@@ -450,6 +450,64 @@ function teste_senha_com_codigo(): void {
     }
 }
 
+/* ===================== Requisitos web: convite e ativação de barbeiros ===================== */
+function linkConvite(string $html): string {
+    return preg_match('#ativar\.php\?t=([0-9a-f]{64})#', $html, $m) ? $m[1] : '';
+}
+
+function teste_convite_barbeiro(): void {
+    global $BASE, $pdo;
+    $GLOBALS['LIMPEZA'][] = "DELETE FROM tentativas_login WHERE email LIKE 'convite%.rotas@example.com'";
+    $GLOBALS['LIMPEZA'][] = "DELETE FROM utilizadores WHERE email LIKE 'convite%.rotas@example.com'";
+    $g = new Sessao($BASE); $g->login(TESTE_GESTOR);
+    $r = $g->get('gestao/index.php?m=barbeiros&a=listar');
+    $csrf = Sessao::csrf($r['html']);
+    ok(str_contains($r['html'], 'name="email"') && !str_contains($r['html'], 'Password temporária'), 'formulário de convite disponível (sem senha temporária)', $r);
+
+    // Convite sem bancada (passou a opcional)
+    $r = $g->post('gestao/index.php?m=barbeiros&a=criar', ['nome' => 'Barbeiro Convite Rotas', 'email' => 'convite1.rotas@example.com', 'telefone' => '', 'csrf' => $csrf]);
+    ok($r['status'] === 302, 'gestor convida barbeiro sem bancada', $r);
+    $r = $g->get('gestao/index.php?m=barbeiros&a=listar');
+    $token = linkConvite($r['html']);
+    ok(str_contains($r['html'], 'Por ativar') && $token !== '' && str_contains($r['html'], 'Copiar'), 'lista mostra "Por ativar" e o link para copiar (email não saiu)', $r);
+    $n = (int)$pdo->query("SELECT COUNT(*) FROM utilizadores WHERE email = 'convite1.rotas@example.com' AND convite_token_hash = '" . hash('sha256', $token) . "'")->fetchColumn();
+    ok($n === 1, 'na BD fica só o hash do token');
+
+    $s = new Sessao($BASE);
+    ok(!$s->login('convite1.rotas@example.com', 'qualquer1') && str_contains($s->ultima['html'] ?? '', 'Ativa a conta'), 'conta por ativar não entra', $s->ultima);
+
+    // Ativar (Review Focus 3: o link só serve uma vez)
+    $a = new Sessao($BASE);
+    $f = $a->get('gestao/ativar.php?t=' . $token);
+    ok($f['status'] === 200 && str_contains($f['html'], 'name="nova_password"') && str_contains($f['html'], 'Barbeiro Convite Rotas'), 'link de ativação abre o formulário da senha', $f);
+    $r = $a->post('gestao/ativar.php?t=' . $token, ['nova_password' => 'fraca', 'confirmar_password' => 'fraca', 'csrf' => Sessao::csrf($f['html'])]);
+    ok($r['status'] === 200 && str_contains($r['html'], '8 caracteres'), 'senha fraca recusada na ativação', $r);
+    $r = $a->post('gestao/ativar.php?t=' . $token, ['nova_password' => 'Ativa!2026x', 'confirmar_password' => 'Ativa!2026x', 'csrf' => Sessao::csrf($f['html'])]);
+    ok($r['status'] === 302 && str_contains($r['local'], 'login.php'), 'ativação concluída volta ao login', $r);
+    ok((new Sessao($BASE))->login('convite1.rotas@example.com', 'Ativa!2026x'), 'barbeiro ativado entra com a senha que escolheu');
+    $r = (new Sessao($BASE))->get('gestao/ativar.php?t=' . $token);
+    ok(!str_contains($r['html'], 'name="nova_password"') && str_contains($r['html'], 'inválido'), 'o mesmo link não serve outra vez', $r);
+
+    // Reenviar convite invalida o link anterior; link expirado não serve
+    $g->post('gestao/index.php?m=barbeiros&a=criar', ['nome' => 'Barbeiro Convite Dois', 'email' => 'convite2.rotas@example.com', 'csrf' => $csrf]);
+    $antigo = linkConvite($g->get('gestao/index.php?m=barbeiros&a=listar')['html']);
+    $id2 = (int)$pdo->query("SELECT id FROM utilizadores WHERE email = 'convite2.rotas@example.com'")->fetchColumn();
+    $r = $g->post('gestao/index.php?m=barbeiros&a=reenviar_convite', ['id' => $id2, 'csrf' => $csrf]);
+    $novo = linkConvite($g->get('gestao/index.php?m=barbeiros&a=listar')['html']);
+    ok($novo !== '' && $novo !== $antigo, 'reenviar convite gera um link novo', $r);
+    ok(str_contains((new Sessao($BASE))->get('gestao/ativar.php?t=' . $antigo)['html'], 'inválido'), 'o link antigo deixa de valer');
+    ok(str_contains((new Sessao($BASE))->get('gestao/ativar.php?t=' . $novo)['html'], 'name="nova_password"'), 'o link novo funciona');
+    $pdo->exec("UPDATE utilizadores SET convite_expira_em = NOW() - INTERVAL 1 HOUR WHERE id = $id2");
+    ok(str_contains((new Sessao($BASE))->get('gestao/ativar.php?t=' . $novo)['html'], 'inválido'), 'link expirado não serve');
+
+    // Barbeiro (perfil) não pode reenviar convites
+    $hashAntes = (string)$pdo->query("SELECT convite_token_hash FROM utilizadores WHERE id = $id2")->fetchColumn();
+    $b = new Sessao($BASE); $b->login(TESTE_BARBEIRO);
+    $rb = $b->get('gestao/index.php?m=agenda&a=listar');
+    $b->post('gestao/index.php?m=barbeiros&a=reenviar_convite', ['id' => $id2, 'csrf' => Sessao::csrf($rb['html'])]);
+    ok((string)$pdo->query("SELECT convite_token_hash FROM utilizadores WHERE id = $id2")->fetchColumn() === $hashAntes, 'barbeiro não consegue reenviar convites');
+}
+
 /* ===================== Task 5: stock e pedidos ===================== */
 function teste_stock_pedidos(): void {
     global $BASE, $pdo;
@@ -550,7 +608,7 @@ function teste_publico(): void {
 try {
     criarUtilizadoresTeste($pdo);
     foreach (['teste_modular_helpers', 'teste_gestao_base', 'teste_agenda_perfil', 'teste_modulos_gestor',
-              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda', 'teste_login_seguro', 'teste_2fa_perfil', 'teste_senha_com_codigo'] as $t) {
+              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda', 'teste_login_seguro', 'teste_2fa_perfil', 'teste_senha_com_codigo', 'teste_convite_barbeiro'] as $t) {
         if (function_exists($t)) { echo "--- $t\n"; $t(); }
     }
 } finally {

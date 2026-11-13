@@ -97,6 +97,40 @@ function definirSenha(PDO $pdo, int $uid, string $senha): void {
         ->execute([password_hash($senha, PASSWORD_DEFAULT), $uid]);
 }
 
+/* ---------- Convites de barbeiros ---------- */
+
+const CONVITE_VALIDADE_HORAS = 48;
+
+/** Novo convite (o anterior deixa de valer). Devolve o token em claro: na BD fica só o sha256. */
+function criarConvite(PDO $pdo, int $uid): string {
+    $token = bin2hex(random_bytes(32));
+    $pdo->prepare("UPDATE utilizadores SET convite_token_hash = ?, convite_expira_em = NOW() + INTERVAL " . CONVITE_VALIDADE_HORAS . " HOUR
+                   WHERE id = ?")->execute([hash('sha256', $token), $uid]);
+    return $token;
+}
+
+/** Utilizador do convite, se o token for válido e não tiver expirado. */
+function utilizadorPorConvite(PDO $pdo, string $token): ?array {
+    if (!preg_match('/^[0-9a-f]{64}$/', $token)) return null;
+    $st = $pdo->prepare("SELECT * FROM utilizadores WHERE convite_token_hash = ? AND convite_expira_em > NOW() AND ativo = 1");
+    $st->execute([hash('sha256', $token)]);
+    return $st->fetch(PDO::FETCH_ASSOC) ?: null;
+}
+
+/** O barbeiro escolheu a senha: a conta fica ativa e o link deixa de servir. */
+function ativarConta(PDO $pdo, int $uid, string $senha): void {
+    $pdo->prepare("UPDATE utilizadores SET password_hash = ?, convite_token_hash = NULL, convite_expira_em = NULL,
+                   precisa_alterar_password = 0 WHERE id = ?")->execute([password_hash($senha, PASSWORD_DEFAULT), $uid]);
+}
+
+/** URL absoluto de gestao/ativar.php (a partir do pedido atual, que corre dentro de gestao/). */
+function linkAtivacao(string $token): string {
+    $https = !empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off';
+    $host  = (string)($_SERVER['HTTP_HOST'] ?? 'localhost');
+    $dir   = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? '/gestao/index.php'))), '/');
+    return ($https ? 'https' : 'http') . '://' . $host . $dir . '/ativar.php?t=' . $token;
+}
+
 /** Cookie "Lembrar o meu email": só o email, nunca a senha. */
 function guardarCookieEmail(?string $email): void {
     $opcoes = ['path' => '/', 'httponly' => true, 'samesite' => 'Lax',
