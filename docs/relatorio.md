@@ -51,7 +51,11 @@ Ver **[base-de-dados.md](base-de-dados.md)**: diagrama ER, explicação de cada 
   5. Uma conta por ativar não consegue entrar.
 - **Sessão:** guarda `utilizador_id`, `barbearia_id` e `tipo`. Todas as páginas da gestão passam pelo `gestao/index.php`, que recusa quem não tem sessão. O logout destrói a sessão.
 - **Mudar a senha:** exige um **código enviado por email** (OTP de 6 dígitos, 15 min, 5 tentativas, uso único).
-- **"Esqueci-me da senha":** `gestao/recuperar.php`. A resposta é igual para emails que existem e que não existem.
+- **"Esqueci-me da senha":** `gestao/recuperar.php`.
+  - A resposta é igual para emails que existem e que não existem, e o tempo de resposta também, porque se faz o mesmo trabalho.
+  - Limite de 5 pedidos por email em 15 min.
+  - O código **nunca aparece no ecrã para uma conta real**, só para as contas de teste (`example.com`). De outra forma, quem soubesse o email ficava com a conta.
+- **Limite do 2FA:** os códigos errados da app contam no mesmo limite de tentativas da conta. Repetir a senha não reinicia a contagem.
 - **Regra de senha:** pelo menos 8 caracteres, com letras e números.
 
 ## 4. Segurança
@@ -144,6 +148,8 @@ Ficam na barbearia de demonstração **Navalha de Ouro**, para não darem acesso
 | Barbeiro | `avaliacao.barbeiro@example.com` | `Barbeiro!2026` |
 
 `example.com` é um domínio reservado. Os códigos por email aparecem no ecrã no servidor da UA.
+
+Como estas senhas são públicas, alguém pode mudá-las ou ativar o 2FA nestas contas. Para as repor, basta voltar a correr `sql/utilizadores_teste.sql`.
 
 ## 11. Critérios de avaliação → onde está
 
