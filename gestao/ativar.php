@@ -27,6 +27,7 @@ if ($u && $_SERVER['REQUEST_METHOD'] === 'POST') {
         $erro = 'As duas senhas não coincidem.';
     } else {
         ativarConta($pdo, (int)$u['id'], $nova);
+        terminarSessaoAtual();   // quem ativou tem de entrar com a SUA conta, nunca com a sessão que estava aberta
         header('Location: login.php?ativada=1');
         exit;
     }

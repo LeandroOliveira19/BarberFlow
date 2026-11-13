@@ -571,6 +571,22 @@ function teste_convite_barbeiro(): void {
     $rb = $b->get('gestao/index.php?m=agenda&a=listar');
     $b->post('gestao/index.php?m=barbeiros&a=reenviar_convite', ['id' => $id2, 'csrf' => Sessao::csrf($rb['html'])]);
     ok((string)$pdo->query("SELECT convite_token_hash FROM utilizadores WHERE id = $id2")->fetchColumn() === $hashAntes, 'barbeiro não consegue reenviar convites');
+
+    // Bug reportado na UA: ativar o convite no MESMO browser onde o gestor tem sessão deixava a pessoa na conta do gestor
+    $g3 = new Sessao($BASE); $g3->login(TESTE_GESTOR);
+    $r = $g3->get('gestao/index.php?m=barbeiros&a=listar');
+    $g3->post('gestao/index.php?m=barbeiros&a=criar', ['nome' => 'Barbeiro Convite Tres', 'email' => 'convite3.rotas@example.com', 'csrf' => Sessao::csrf($r['html'])]);
+    $token3 = linkConvite($g3->get('gestao/index.php?m=barbeiros&a=listar')['html']);
+    $f = $g3->get('gestao/ativar.php?t=' . $token3);
+    ok(str_contains($f['html'], 'name="nova_password"'), 'o link abre no browser onde o gestor tem sessão', $f);
+    $g3->post('gestao/ativar.php?t=' . $token3, ['nova_password' => 'Tres!2026x', 'confirmar_password' => 'Tres!2026x', 'csrf' => Sessao::csrf($f['html'])]);
+    $r = $g3->get('gestao/login.php?ativada=1');
+    ok($r['status'] === 200 && str_contains($r['html'], 'name="password"'), 'depois de ativar aparece o login (não entra na conta do gestor)', $r);
+    $r = $g3->get('gestao/index.php?m=servicos&a=listar');
+    ok($r['status'] === 302 && str_contains($r['local'], 'login.php'), 'a sessão do gestor foi terminada nesse browser', $r);
+    ok($g3->login('convite3.rotas@example.com', 'Tres!2026x'), 'o barbeiro entra com a conta dele', $g3->ultima);
+    $r = $g3->get('gestao/index.php?m=servicos&a=listar');
+    ok(str_contains($r['html'], 'Página não encontrada'), 'e só com privilégios de barbeiro', $r);
 }
 
 /* ===================== Task 5: stock e pedidos ===================== */
