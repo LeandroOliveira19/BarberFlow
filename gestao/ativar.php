@@ -9,7 +9,8 @@ require __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../config/modular.php';
 require_once __DIR__ . '/../config/contas.php';
 ini_set('display_errors', '0');
-session_start();
+require_once __DIR__ . '/../config/sessao.php';
+iniciarSessaoSegura();
 tokenCsrf();
 
 $token = is_string($_GET['t'] ?? null) ? $_GET['t'] : '';

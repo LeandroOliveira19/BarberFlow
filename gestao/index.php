@@ -24,7 +24,8 @@ spl_autoload_register(function (string $classe): void {
 });
 ini_set('display_errors', '0');
 
-session_start();
+require_once __DIR__ . '/../config/sessao.php';
+iniciarSessaoSegura();
 
 /* ---------- 1. Sessão ---------- */
 if (!isset($_SESSION['utilizador_id'], $_SESSION['barbearia_id'], $_SESSION['tipo'])) {
