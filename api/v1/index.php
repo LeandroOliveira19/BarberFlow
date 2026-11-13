@@ -131,7 +131,7 @@ function h_disponibilidade(PDO $pdo, array $p): never {
     $tok = $_GET['token'] ?? null;
     if (is_string($mid) && ctype_digit($mid) && is_string($tok)) {
         $m = carregarMarcacaoPorId($pdo, (int)$mid);
-        if ($m && (int)$m['barbearia_id'] === (int)$b['id'] && hash_equals(tokenMarcacao((int)$m['id'], (int)$m['cliente_id']), $tok)) {
+        if ($m && (int)$m['barbearia_id'] === (int)$b['id'] && tokenMarcacaoValido($tok, (int)$m['id'], (int)$m['cliente_id'])) {
             $ignorar = (int)$m['id'];
         }
     }
@@ -183,17 +183,17 @@ function h_reenviar(PDO $pdo, array $p): never {
     responder($out);
 }
 
-/** GET marcacoes?tokens=id:tok,id:tok — só devolve marcações cujo token é válido. */
+/** GET marcacoes?tokens=id:tok,id:tok — só devolve marcações cujo token (JWT ou antigo) é válido. */
 function h_listar_marcacoes(PDO $pdo, array $p): never {
     $pares = [];
     foreach (array_slice(explode(',', (string)($_GET['tokens'] ?? '')), 0, 50) as $par) {
-        if (preg_match('/^(\d{1,10}):([0-9a-f]{64})$/', trim($par), $m)) $pares[(int)$m[1]] = $m[2];
+        if (preg_match('/^(\d{1,10}):([0-9a-f]{64}|[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/', trim($par), $m)) $pares[(int)$m[1]] = $m[2];
     }
     $lista = [];
     $expiradas = [];
     foreach ($pares as $id => $tok) {
         $m = carregarMarcacaoPorId($pdo, $id);
-        if (!$m || !hash_equals(tokenMarcacao((int)$m['id'], (int)$m['cliente_id']), $tok)) continue;
+        if (!$m || !tokenMarcacaoValido($tok, (int)$m['id'], (int)$m['cliente_id'])) continue;
         if (!isset($expiradas[$m['barbearia_id']])) { expirarPendentes($pdo, (int)$m['barbearia_id']); $expiradas[$m['barbearia_id']] = true; }
         $m = normalizarEstadoMarcacao($pdo, carregarMarcacaoPorId($pdo, $id) ?? $m);
         $lista[] = itemMarcacao($m);
@@ -223,7 +223,7 @@ function itemMarcacao(array $m): array {
 function marcacaoComToken(PDO $pdo, string $id, array $corpo): array {
     $m = ctype_digit($id) ? carregarMarcacaoPorId($pdo, (int)$id) : null;
     $tok = $corpo['token'] ?? '';
-    if (!$m || !is_string($tok) || !hash_equals(tokenMarcacao((int)$m['id'], (int)$m['cliente_id']), $tok)) {
+    if (!$m || !is_string($tok) || !tokenMarcacaoValido($tok, (int)$m['id'], (int)$m['cliente_id'])) {
         erro(404, 'marcacao_nao_encontrada', 'Marcação não encontrada.');
     }
     return $m;
