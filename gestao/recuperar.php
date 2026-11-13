@@ -29,15 +29,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $erro = 'O formulário expirou. Tenta de novo.';
     } elseif ($passo === 1) {
         $email = trim((string)($_POST['email'] ?? ''));
+        $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $erro = 'Indica um email válido.';
+        } elseif ($espera = tentativasExcedidas($pdo, 'recuperar:' . $email, $ip)) {
+            // Limite igual para emails que existem e que não existem (não revela contas; não enche a caixa da vítima)
+            $erro = "Demasiados pedidos. Tenta daqui a {$espera} minuto" . ($espera > 1 ? 's' : '') . '.';
         } else {
+            registarTentativaFalhada($pdo, 'recuperar:' . $email, $ip);   // cada pedido conta para o limite
             unset($_SESSION['recuperar_codigo_ecra']);
             $u = contaParaRecuperar($pdo, $email);
             if ($u) {
                 $codigo  = criarCodigoSeguranca($pdo, (int)$u['id'], 'recuperar_password');
                 $enviado = enviarCodigoSegurancaEmail($email, (string)$u['nome'], $codigo, 'recuperar_password');
-                if (mostrarCodigoNoEcra($enviado)) $_SESSION['recuperar_codigo_ecra'] = $codigo;
+                // Só contas de teste (example.com…): numa conta real, mostrar o código entregava-a a quem soubesse o email
+                if (emailDeTeste($email) && mostrarCodigoNoEcra($enviado)) $_SESSION['recuperar_codigo_ecra'] = $codigo;
+            } else {
+                password_hash(bin2hex(random_bytes(8)), PASSWORD_DEFAULT);   // trabalho equivalente ao criar o código
             }
             $_SESSION['recuperar_email'] = $email;
             header('Location: recuperar.php?passo=2');   // igual com ou sem conta

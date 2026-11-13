@@ -32,14 +32,15 @@ function jwtValidar(string $jwt, string $segredo): ?array {
 
     $cab = jwtB64Descodificar($cab64);
     $pay = jwtB64Descodificar($pay64);
-    $ass = jwtB64Descodificar($ass64);
-    if ($cab === null || $pay === null || $ass === null) return null;
+    if ($cab === null || $pay === null) return null;
 
     $cabecalho = json_decode($cab, true);
     if (!is_array($cabecalho) || ($cabecalho['alg'] ?? null) !== 'HS256') return null;
 
-    $esperada = hash_hmac('sha256', $cab64 . '.' . $pay64, $segredo, true);
-    if (!hash_equals($esperada, $ass)) return null;
+    // Compara o TEXTO da assinatura (forma canónica): o último carácter base64url só usa 2 dos seus 6 bits,
+    // por isso comparar os bytes descodificados aceitaria 4 variantes da mesma assinatura.
+    $esperada = jwtB64Codificar(hash_hmac('sha256', $cab64 . '.' . $pay64, $segredo, true));
+    if (!hash_equals($esperada, $ass64)) return null;
 
     $payload = json_decode($pay, true);
     return is_array($payload) ? $payload : null;

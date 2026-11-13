@@ -10,6 +10,8 @@ declare(strict_types=1);
 const LOGIN_MAX_POR_EMAIL = 5;    // falhas por email em LOGIN_JANELA_MIN minutos
 const LOGIN_MAX_POR_IP    = 20;   // falhas por IP na mesma janela
 const LOGIN_JANELA_MIN    = 15;
+/** Hash bcrypt de um texto aleatório: usado quando o email não existe, para o login demorar o mesmo. */
+const LOGIN_HASH_FICTICIO = '$2y$10$iLJ/ahhix4QOBuGsF5ttCOp6t3Q210tocPb2Y3RJvzagk79EKIZbu';   // de 32 hex aleatórios, descartados
 
 /** Minutos que faltam se o email ou o IP excederam o limite de falhas; null se pode tentar. */
 function tentativasExcedidas(PDO $pdo, string $email, string $ip): ?int {

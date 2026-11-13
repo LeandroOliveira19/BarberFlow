@@ -13,6 +13,15 @@ function deveDevolverCodigo(array $cred, bool $emailEnviado): bool {
     return !$emailEnviado && ($cred['api_codigo_se_email_falhar'] ?? false) === true;
 }
 
+/**
+ * Domínios reservados para testes (RFC 2606/6761): nunca recebem email e são os das contas de avaliação.
+ * A recuperação de senha SÓ mostra o código no ecrã para estes emails: para uma conta real isso
+ * entregaria a conta a quem soubesse o email (revisão final, C1).
+ */
+function emailDeTeste(string $email): bool {
+    return preg_match('/@(example\.(com|net|org)|[^@]+\.(test|invalid|example))$/i', $email) === 1;
+}
+
 /** O mesmo, lendo as credenciais (para a gestão, que não usa o _lib.php da API). */
 function mostrarCodigoNoEcra(bool $emailEnviado): bool {
     static $cred = null;

@@ -450,6 +450,71 @@ function teste_senha_com_codigo(): void {
     }
 }
 
+/* ===================== Revisão final: correções de segurança ===================== */
+function mediaLoginMs(string $email, string $senha, int $vezes = 3): float {
+    global $BASE;
+    $total = 0.0;
+    for ($i = 0; $i < $vezes; $i++) {
+        $s = new Sessao($BASE);
+        $f = $s->get('gestao/login.php');
+        $t = microtime(true);
+        $s->post('gestao/login.php', ['email' => sprintf($email, $i), 'password' => $senha, 'csrf' => Sessao::csrf($f['html'])]);
+        $total += (microtime(true) - $t) * 1000;
+    }
+    return $total / $vezes;
+}
+
+function teste_revisao_seguranca(): void {
+    global $BASE, $pdo;
+    require_once __DIR__ . '/../../../config/totp.php';
+    $limpar = fn() => $pdo->exec("DELETE FROM tentativas_login WHERE email LIKE '%rotas%@%' OR email IN ('" . TESTE_GESTOR . "','" . TESTE_BARBEIRO . "')");
+    $limpar();
+    $hashTeste = password_hash(TESTE_PASSWORD, PASSWORD_DEFAULT);
+    try {
+        // C1: o código de recuperação NUNCA aparece no ecrã para um email real (só para domínios de teste)
+        $pdo->prepare("INSERT INTO utilizadores (nome, email, password_hash, tipo, ativo, barbearia_id) VALUES ('Recuperar Rotas', 'recuperar.rotas@barberflow.pt', ?, 'gestor', 1, 1)")->execute([$hashTeste]);
+        $a = new Sessao($BASE);
+        $f = $a->get('gestao/recuperar.php');
+        $a->post('gestao/recuperar.php', ['email' => 'recuperar.rotas@barberflow.pt', 'csrf' => Sessao::csrf($f['html'])]);
+        $p2 = $a->get('gestao/recuperar.php?passo=2');
+        ok($p2['status'] === 200 && !preg_match('/Código: \d{6}/', $p2['html']), 'recuperar não mostra o código de uma conta real no ecrã', $p2);
+
+        // I3: o passo 1 do recuperar tem limite (5 pedidos por email em 15 min)
+        for ($i = 0; $i < 7; $i++) {
+            $f = $a->get('gestao/recuperar.php');
+            $r = $a->post('gestao/recuperar.php', ['email' => 'recuperar.rotas@barberflow.pt', 'csrf' => Sessao::csrf($f['html'])]);
+        }
+        $n = (int)$pdo->query("SELECT COUNT(*) FROM codigos_seguranca cs JOIN utilizadores u ON u.id = cs.utilizador_id WHERE u.email = 'recuperar.rotas@barberflow.pt'")->fetchColumn();
+        ok($n <= 5, "recuperar: no máximo 5 códigos por email em 15 min ($n criados)");
+
+        // I2: códigos 2FA errados contam para o limite de tentativas (não basta repetir a senha)
+        $segredo = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
+        $pdo->prepare("UPDATE utilizadores SET totp_segredo = ?, totp_ativo = 1 WHERE email = ?")->execute([$segredo, TESTE_BARBEIRO]);
+        for ($ronda = 0; $ronda < 2; $ronda++) {
+            $s = new Sessao($BASE);
+            $f = $s->get('gestao/login.php');
+            $r = $s->post('gestao/login.php', ['email' => TESTE_BARBEIRO, 'password' => TESTE_PASSWORD, 'csrf' => Sessao::csrf($f['html'])]);
+            for ($i = 0; $i < 5 && str_contains($r['html'], 'name="codigo_2fa"'); $i++) {
+                $r = $s->post('gestao/login.php', ['codigo_2fa' => '000000', 'csrf' => Sessao::csrf($r['html'])]);
+            }
+        }
+        $s = new Sessao($BASE);
+        ok(!$s->login(TESTE_BARBEIRO, TESTE_PASSWORD, totpCodigo($segredo, time())) && str_contains($s->ultima['html'] ?? '', 'Demasiadas tentativas'),
+           'depois de muitos códigos 2FA errados o login fica bloqueado', $s->ultima);
+        $pdo->prepare("UPDATE utilizadores SET totp_segredo = NULL, totp_ativo = 0 WHERE email = ?")->execute([TESTE_BARBEIRO]);
+        $limpar();
+
+        // I4: um email inexistente não responde muito mais depressa do que um existente (não revela contas)
+        $semConta = mediaLoginMs('tempo.rotas.%d@example.com', 'errada-1');
+        $comConta = mediaLoginMs(TESTE_GESTOR, 'errada-1');
+        ok($semConta >= 0.6 * $comConta, sprintf('login: email inexistente demora como um existente (%.0f ms vs %.0f ms)', $semConta, $comConta));
+    } finally {
+        $pdo->prepare("UPDATE utilizadores SET totp_segredo = NULL, totp_ativo = 0 WHERE email = ?")->execute([TESTE_BARBEIRO]);
+        $pdo->exec("DELETE FROM utilizadores WHERE email = 'recuperar.rotas@barberflow.pt'");
+        $limpar();
+    }
+}
+
 /* ===================== Requisitos web: convite e ativação de barbeiros ===================== */
 function linkConvite(string $html): string {
     return preg_match('#ativar\.php\?t=([0-9a-f]{64})#', $html, $m) ? $m[1] : '';
@@ -608,7 +673,7 @@ function teste_publico(): void {
 try {
     criarUtilizadoresTeste($pdo);
     foreach (['teste_modular_helpers', 'teste_gestao_base', 'teste_agenda_perfil', 'teste_modulos_gestor',
-              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda', 'teste_login_seguro', 'teste_2fa_perfil', 'teste_senha_com_codigo', 'teste_convite_barbeiro'] as $t) {
+              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda', 'teste_login_seguro', 'teste_2fa_perfil', 'teste_senha_com_codigo', 'teste_convite_barbeiro', 'teste_revisao_seguranca'] as $t) {
         if (function_exists($t)) { echo "--- $t\n"; $t(); }
     }
 } finally {
