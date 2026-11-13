@@ -23,11 +23,16 @@ O projeto inclui:
 # Como Instalar e Configurar
 
 1. Clona o repositório para a tua máquina local (ex: dentro da pasta `htdocs` do XAMPP).
-2. Importa a base de dados `esan-dsg09.sql` (presente na raiz) para o teu servidor MySQL local.
+2. Importa o dump da base de dados `esan-dsg09` (não está no repositório, porque tem dados reais) e corre, por ordem, `movimentos_stock.sql` e os ficheiros de `sql/`.
 3. Na pasta `config/`:
    - Renomeia `credenciais.example.php` para `credenciais.php` e preenche com as tuas chaves de API.
    - Renomeia `db.example.php` para `db.php` e ajusta as configurações de ligação à base de dados.
 4. Acede ao site através de `http://localhost/projeto/projeto/`.
+
+# Documentação
+
+- **[Relatório](docs/relatorio.md):** arquitetura, segurança (perfis, CSRF, 2FA, OTP, JWT), API, testes, utilizadores de teste e a tabela "critério de avaliação → onde está".
+- **[Base de dados](docs/base-de-dados.md):** diagrama ER, explicação das tabelas e a vista `vw_agenda`.
 
 # Arquitetura modular (atividade 06)
 
@@ -68,8 +73,9 @@ e, se for para aparecer no menu, uma entrada em `gestao/layout/menu.php`.
 `web_objects.php` e `web_marcar.php`.
 
 ## 🔐 Credenciais de Teste
-- **Gestor:** `gestor@barberflow.pt` (Password: `123456`)
-- **Barbeiro:** `andre@barberflow.pt` (Password: `barbeiro123`)
+Contas da barbearia de demonstração **Navalha de Ouro**, sem acesso aos clientes reais (`sql/utilizadores_teste.sql`):
+- **Gestor:** `avaliacao.gestor@example.com` (Password: `Avaliacao!2026`)
+- **Barbeiro:** `avaliacao.barbeiro@example.com` (Password: `Barbeiro!2026`)
 
 ## ✨ Funcionalidades Principais
 - [x] Isolamento de dados Multi-Tenant (ex: RLBarber e Navalha de Ouro).
