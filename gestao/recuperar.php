@@ -11,7 +11,8 @@ require_once __DIR__ . '/../config/contas.php';
 require_once __DIR__ . '/../config/mailer_contas.php';
 require_once __DIR__ . '/../config/politica_codigo.php';
 ini_set('display_errors', '0');
-session_start();
+require_once __DIR__ . '/../config/sessao.php';
+iniciarSessaoSegura();
 tokenCsrf();
 
 $passo = ($_GET['passo'] ?? '') === '2' ? 2 : 1;

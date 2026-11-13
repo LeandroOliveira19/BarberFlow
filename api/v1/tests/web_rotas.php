@@ -450,6 +450,140 @@ function teste_senha_com_codigo(): void {
     }
 }
 
+/* ===================== Auditoria de privilégios e separação entre barbearias ===================== */
+/** Impressão digital dos dados da barbearia 1 (RL Barber): se mudar, alguém de fora mexeu nela. */
+function impressaoBarbearia1(PDO $pdo): string {
+    $partes = [];
+    foreach ([
+        "SELECT id, nome, preco, ativo FROM servicos WHERE barbearia_id = 1 ORDER BY id",
+        "SELECT id, nome, email, tipo, ativo, password_hash, convite_token_hash, totp_ativo FROM utilizadores WHERE barbearia_id = 1 ORDER BY id",
+        "SELECT id, nome, barbeiro_id, ativo FROM bancadas WHERE barbearia_id = 1 ORDER BY id",
+        "SELECT id, nome, stock_geral, ativo FROM materiais WHERE barbearia_id = 1 ORDER BY id",
+        "SELECT id, nome, nif FROM fornecedores WHERE barbearia_id = 1 ORDER BY id",
+        "SELECT id, estado, inicio FROM marcacoes WHERE barbearia_id = 1 ORDER BY id",
+        "SELECT chave, valor FROM configuracoes WHERE barbearia_id = 1 ORDER BY chave",
+        "SELECT nome, morada FROM barbearias WHERE id = 1",
+        "SELECT bm.bancada_id, bm.material_id, bm.quantidade FROM bancada_materiais bm JOIN bancadas b ON b.id = bm.bancada_id WHERE b.barbearia_id = 1 ORDER BY 1, 2",
+    ] as $sql) {
+        $partes[] = json_encode($pdo->query($sql)->fetchAll(PDO::FETCH_NUM));
+    }
+    return md5(implode('|', $partes));
+}
+
+function teste_auditoria_privilegios(): void {
+    global $BASE, $pdo;
+    $GLOBALS['LIMPEZA'][] = "DELETE FROM utilizadores WHERE email = 'gestor.outra.rotas@example.com'";
+    $GLOBALS['LIMPEZA'][] = "DELETE FROM bancadas WHERE barbearia_id = 2 AND nome LIKE 'Bancada Auditoria%'";
+    $pdo->prepare("INSERT INTO utilizadores (nome, email, password_hash, tipo, ativo, barbearia_id) VALUES ('Gestor Outra Rotas', 'gestor.outra.rotas@example.com', ?, 'gestor', 1, 2)")
+        ->execute([password_hash(TESTE_PASSWORD, PASSWORD_DEFAULT)]);
+
+    // Alvos da RL Barber (barbearia 1)
+    $marc  = criarMarcacaoTeste($pdo);
+    $serv  = (int)$pdo->query("SELECT id FROM servicos WHERE barbearia_id = 1 AND ativo = 1 LIMIT 1")->fetchColumn();
+    $servN = (string)$pdo->query("SELECT nome FROM servicos WHERE id = $serv")->fetchColumn();
+    $barb  = (int)$pdo->query("SELECT id FROM utilizadores WHERE email = '" . TESTE_BARBEIRO . "'")->fetchColumn();
+    $banc  = (int)$pdo->query("SELECT id FROM bancadas WHERE barbearia_id = 1 LIMIT 1")->fetchColumn();
+    $mat   = (int)$pdo->query("SELECT id FROM materiais WHERE barbearia_id = 1 AND ativo = 1 LIMIT 1")->fetchColumn();
+    $forn  = (int)$pdo->query("SELECT id FROM fornecedores WHERE barbearia_id = 1 LIMIT 1")->fetchColumn();
+    $fornN = (string)$pdo->query("SELECT nome FROM fornecedores WHERE id = $forn")->fetchColumn();
+    $antes = impressaoBarbearia1($pdo);
+
+    // 1) Gestor de OUTRA barbearia (Navalha de Ouro) ataca a RL Barber com ids dela
+    $o = new Sessao($BASE);
+    ok($o->login('gestor.outra.rotas@example.com'), 'gestor de outra barbearia entra');
+    $csrf = Sessao::csrf($o->get('gestao/index.php?m=servicos&a=listar')['html']);
+    $ataques = [
+        ['servicos', 'apagar', ['id' => $serv]],
+        ['servicos', 'guardar', ['id' => $serv, 'nome' => 'Atacado', 'duracao_minutos' => 30, 'preco' => '1']],
+        ['barbeiros', 'apagar', ['id' => $barb]],
+        ['barbeiros', 'ativar', ['id' => $barb]],
+        ['barbeiros', 'editar', ['id' => $barb, 'nome' => 'Atacado', 'telefone' => '', 'bancada_id' => $banc]],
+        ['barbeiros', 'reenviar_convite', ['id' => $barb]],
+        ['bancadas', 'apagar', ['id' => $banc]],
+        ['bancadas', 'ativar', ['id' => $banc]],
+        ['bancadas', 'editar', ['id' => $banc, 'nome' => 'Atacada', 'barbeiro_id' => '']],
+        ['fornecedores', 'guardar', ['id' => $forn, 'nome' => 'Atacado']],
+        ['stock', 'apagar', ['id' => $mat]],
+        ['stock', 'guardar', ['id' => $mat, 'nome' => 'Atacado', 'unidade' => 'un', 'stock_geral' => '999', 'stock_minimo' => '0']],
+        ['stock', 'transferir', ['material_id' => $mat, 'bancada_id' => $banc, 'quantidade' => '1']],
+        ['agenda', 'estado', ['id' => $marc, 'estado' => 'cancelada']],
+    ];
+    foreach ($ataques as [$m, $a, $dados]) $o->post("gestao/index.php?m=$m&a=$a", $dados + ['csrf' => $csrf]);
+    ok(impressaoBarbearia1($pdo) === $antes, 'gestor de outra barbearia não altera nada da RL Barber (14 ações com ids dela)');
+
+    // Leitura: o "?editar=<id da RL Barber>" não pode mostrar os dados dela no formulário
+    $r = $o->get("gestao/index.php?m=servicos&a=listar&editar=$serv");
+    ok(!str_contains($r['html'], 'value="' . htmlspecialchars($servN) . '"'), 'serviço da RL Barber não aparece no formulário de outra barbearia', $r);
+    $r = $o->get("gestao/index.php?m=fornecedores&a=listar&editar=$forn");
+    ok($fornN === '' || !str_contains($r['html'], 'value="' . htmlspecialchars($fornN) . '"'), 'fornecedor da RL Barber não aparece', $r);
+    $r = $o->get("gestao/index.php?m=barbeiros&a=listar&editar=$barb");
+    ok(!str_contains($r['html'], 'Barbeiro Teste'), 'barbeiro da RL Barber não aparece', $r);
+    $r = $o->get('gestao/index.php?m=agenda&a=listar&vista=proximas');
+    // (pelo telemóvel do cliente de teste da RL Barber: outro teste cria um "Cliente Rotas Navalha" na barbearia 2)
+    ok(!str_contains($r['html'], '919990001'), 'agenda de outra barbearia não mostra clientes da RL Barber', $r);
+
+    // Bancada da própria barbearia com um barbeiro de OUTRA barbearia: não pode ficar ligada (a criar e a editar).
+    // Barbeiro da RL Barber SEM bancada (com bancada, a chave única barbeiro_id escondia o problema).
+    $GLOBALS['LIMPEZA'][] = "DELETE FROM utilizadores WHERE email = 'barbeiro.solto.rotas@example.com'";
+    $pdo->prepare("INSERT INTO utilizadores (nome, email, password_hash, tipo, ativo, barbearia_id) VALUES ('Barbeiro Solto RL', 'barbeiro.solto.rotas@example.com', ?, 'barbeiro', 1, 1)")
+        ->execute([password_hash(TESTE_PASSWORD, PASSWORD_DEFAULT)]);
+    $solto = (int)$pdo->lastInsertId();
+    array_unshift($GLOBALS['LIMPEZA'], "DELETE FROM bancadas WHERE barbeiro_id = $solto");
+    $o->post('gestao/index.php?m=bancadas&a=criar', ['nome' => 'Bancada Auditoria', 'barbeiro_id' => $solto, 'csrf' => $csrf]);
+    $ligada = (int)$pdo->query("SELECT COUNT(*) FROM bancadas WHERE barbeiro_id = $solto")->fetchColumn();
+    ok($ligada === 0, 'criar: não se atribui a uma bancada um barbeiro de outra barbearia');
+    $o->post('gestao/index.php?m=bancadas&a=criar', ['nome' => 'Bancada Auditoria Livre', 'barbeiro_id' => '', 'csrf' => $csrf]);
+    $propria = (int)$pdo->query("SELECT id FROM bancadas WHERE barbearia_id = 2 AND nome = 'Bancada Auditoria Livre' LIMIT 1")->fetchColumn();
+    ok($propria > 0, 'a bancada sem barbeiro é criada normalmente');
+    $o->post('gestao/index.php?m=bancadas&a=editar', ['id' => $propria, 'nome' => 'Bancada Auditoria Livre', 'barbeiro_id' => $solto, 'csrf' => $csrf]);
+    ok((int)$pdo->query("SELECT COUNT(*) FROM bancadas WHERE barbeiro_id = $solto")->fetchColumn() === 0, 'editar: não se atribui um barbeiro de outra barbearia');
+    $r = $o->get('gestao/index.php?m=bancadas&a=listar');
+    ok(!str_contains($r['html'], 'Barbeiro Solto RL'), 'a lista de bancadas de outra barbearia não mostra barbeiros da RL Barber', $r);
+
+    // 2) Barbeiro: nenhuma ação de gestor (GET e POST) e nada muda
+    $antes = impressaoBarbearia1($pdo);   // de novo: o "barbeiro solto" acima foi criado depois da 1.ª impressão
+    $b = new Sessao($BASE); $b->login(TESTE_BARBEIRO);
+    $csrfB = Sessao::csrf($b->get('gestao/index.php?m=agenda&a=listar')['html']);
+    $recusadas = 0; $total = 0;
+    foreach (['servicos' => ['listar', 'guardar', 'apagar'], 'barbeiros' => ['listar', 'criar', 'editar', 'apagar', 'ativar', 'reenviar_convite'],
+              'bancadas' => ['listar', 'criar', 'editar', 'apagar', 'ativar'], 'fornecedores' => ['listar', 'guardar'],
+              'definicoes' => ['editar', 'guardar'], 'stock' => ['guardar', 'apagar', 'transferir'], 'pedidos' => ['listar', 'aprovar', 'rejeitar', 'entregar']] as $m => $acoes) {
+        foreach ($acoes as $a) {
+            $total++;
+            // Recusa = o index devolve o dashboard com "Página não encontrada" (POST → redirect; GET → mesma página)
+            $r = $b->post("gestao/index.php?m=$m&a=$a", ['id' => $serv, 'nome' => 'Atacado', 'csrf' => $csrfB]);
+            $destino = $r['status'] === 302 ? $b->get('gestao/' . $r['local']) : $r;
+            if ((str_contains($r['local'], 'm=dashboard') || $r['status'] === 200) && str_contains($destino['html'], 'Página não encontrada')) $recusadas++;
+        }
+    }
+    ok($recusadas === $total && impressaoBarbearia1($pdo) === $antes, "barbeiro: as $total ações de gestor são recusadas e nada muda ($recusadas recusadas)");
+}
+
+/** Cabeçalho Set-Cookie do PHPSESSID de uma página (pedido sem cookies). */
+function cookieSessaoDe(string $url): string {
+    global $BASE;
+    $ch = curl_init($BASE . $url);
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HEADER => true, CURLOPT_NOBODY => false]);
+    $resp = (string)curl_exec($ch);
+    curl_close($ch);
+    return preg_match('/^Set-Cookie:\s*(PHPSESSID=[^\r\n]+)/mi', $resp, $m) ? $m[1] : '';
+}
+
+function teste_cookie_sessao(): void {
+    foreach (['gestao/login.php', 'index.php?slug=rlbarber', 'gestao/recuperar.php'] as $url) {
+        $c = cookieSessaoDe($url);
+        ok($c !== '' && stripos($c, 'HttpOnly') !== false && stripos($c, 'SameSite=Lax') !== false, "cookie de sessão HttpOnly e SameSite=Lax em $url ($c)");
+    }
+    // use_strict_mode: um id de sessão inventado pelo atacante não é aceite (o servidor cria outro)
+    global $BASE;
+    $inventado = 'atacante' . bin2hex(random_bytes(8));   // novo em cada execução (nunca existiu no servidor)
+    $ch = curl_init($BASE . 'gestao/login.php');
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HEADER => true, CURLOPT_COOKIE => "PHPSESSID=$inventado"]);
+    $resp = (string)curl_exec($ch);
+    curl_close($ch);
+    ok(preg_match('/^Set-Cookie:\s*PHPSESSID=(?!' . $inventado . ')/mi', $resp) === 1, 'id de sessão inventado é substituído (use_strict_mode)');
+}
+
 /* ===================== Revisão final: correções de segurança ===================== */
 function mediaLoginMs(string $email, string $senha, int $vezes = 3): float {
     global $BASE;
@@ -689,7 +823,7 @@ function teste_publico(): void {
 try {
     criarUtilizadoresTeste($pdo);
     foreach (['teste_modular_helpers', 'teste_gestao_base', 'teste_agenda_perfil', 'teste_modulos_gestor',
-              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda', 'teste_login_seguro', 'teste_2fa_perfil', 'teste_senha_com_codigo', 'teste_convite_barbeiro', 'teste_revisao_seguranca'] as $t) {
+              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda', 'teste_login_seguro', 'teste_2fa_perfil', 'teste_senha_com_codigo', 'teste_convite_barbeiro', 'teste_revisao_seguranca', 'teste_auditoria_privilegios', 'teste_cookie_sessao'] as $t) {
         if (function_exists($t)) { echo "--- $t\n"; $t(); }
     }
 } finally {
