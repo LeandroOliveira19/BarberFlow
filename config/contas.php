@@ -133,6 +133,15 @@ function linkAtivacao(string $token): string {
     return ($https ? 'https' : 'http') . '://' . $host . $dir . '/ativar.php?t=' . $token;
 }
 
+/**
+ * Termina qualquer sessão aberta neste browser (ex.: a do gestor que abriu o link de convite no próprio PC).
+ * Sem isto, depois de ativar uma conta ou recuperar uma senha, o login.php via a sessão antiga e entrava nela.
+ */
+function terminarSessaoAtual(): void {
+    $_SESSION = [];
+    session_regenerate_id(true);
+}
+
 /** Cookie "Lembrar o meu email": só o email, nunca a senha. */
 function guardarCookieEmail(?string $email): void {
     $opcoes = ['path' => '/', 'httponly' => true, 'samesite' => 'Lax',

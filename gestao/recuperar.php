@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             definirSenha($pdo, (int)$u['id'], $nova);
             limparTentativas($pdo, $email);
-            unset($_SESSION['recuperar_email'], $_SESSION['recuperar_codigo_ecra']);
+            terminarSessaoAtual();   // a sessão que estivesse aberta neste browser não pode continuar
             header('Location: login.php?senha=1');
             exit;
         }
