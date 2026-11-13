@@ -42,7 +42,7 @@ $MODULOS = [
     'gestor' => [
         'dashboard' => ['ver'],
         'agenda'    => ['listar', 'estado'],
-        'perfil'    => ['editar', 'guardar', 'alterar_password'],
+        'perfil'    => ['editar', 'guardar', 'alterar_password', 'ativar_dois_fatores', 'desativar_dois_fatores'],
         'servicos'     => ['listar', 'guardar', 'apagar'],
         'barbeiros'    => ['listar', 'criar', 'editar', 'apagar', 'ativar'],
         'bancadas'     => ['listar', 'criar', 'editar', 'apagar', 'ativar'],
@@ -54,7 +54,7 @@ $MODULOS = [
     'barbeiro' => [
         'dashboard' => ['ver'],
         'agenda'    => ['listar', 'estado'],
-        'perfil'    => ['editar', 'guardar', 'alterar_password'],
+        'perfil'    => ['editar', 'guardar', 'alterar_password', 'ativar_dois_fatores', 'desativar_dois_fatores'],
         'stock'     => ['listar', 'pedir_reposicao'],   // a sua bancada
     ],
 ];
