@@ -44,18 +44,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($passo2fa && isset($_POST['codigo_2fa'])) {
         $u = carregarUtilizador($pdo, 'id', (int)$_SESSION['login_2fa']['id']);
         $codigo = preg_replace('/\D/', '', (string)$_POST['codigo_2fa']);
-        if ($u && !empty($u['totp_ativo']) && totpVerificar((string)$u['totp_segredo'], $codigo, time())) {
+        // Revisão final I2: os códigos errados contam no mesmo limite da conta (email/IP) — repetir a senha não reinicia nada
+        if ($u && ($espera = tentativasExcedidas($pdo, (string)$u['email'], $ip))) {
+            unset($_SESSION['login_2fa']);
+            $passo2fa = false;
+            $erro = "Demasiadas tentativas. Tenta daqui a {$espera} minuto" . ($espera > 1 ? 's' : '') . '.';
+        } elseif ($u && !empty($u['totp_ativo']) && totpVerificar((string)$u['totp_segredo'], $codigo, time())) {
             limparTentativas($pdo, $u['email']);
             iniciarSessaoUtilizador($u);
             header('Location: index.php');
             exit;
+        } else {
+            if ($u) registarTentativaFalhada($pdo, (string)$u['email'], $ip);
+            $_SESSION['login_2fa']['falhas']++;
         }
-        $_SESSION['login_2fa']['falhas']++;
-        if ($_SESSION['login_2fa']['falhas'] >= 5) {
+        if ($passo2fa && $_SESSION['login_2fa']['falhas'] >= 5) {
             unset($_SESSION['login_2fa']);
             $passo2fa = false;
             $erro = 'Demasiados códigos errados. Entra outra vez com a tua senha.';
-        } else {
+        } elseif ($passo2fa) {
             $erro = 'Código errado. Confirma a hora do telemóvel e tenta de novo.';
         }
     } else {
@@ -68,6 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $erro = "Demasiadas tentativas. Tenta daqui a {$espera} minuto" . ($espera > 1 ? 's' : '') . '.';
         } else {
             $u = carregarUtilizador($pdo, 'email', $email);
+            // Revisão final I4: sem conta, faz-se o mesmo trabalho (bcrypt) para o tempo de resposta não revelar que emails existem
+            if (!$u) password_verify($password, LOGIN_HASH_FICTICIO);
             if ($u && contaPorAtivar($u)) {
                 $erro = 'Ativa a conta pelo link que recebeste por email (ou pede ao gestor um novo convite).';
             } elseif ($u && password_verify($password, $u['password_hash'])) {

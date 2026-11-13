@@ -577,6 +577,13 @@ function teste_jwt(): void {
     verifica(jwtValidar(jwtCriar(['sub' => 7], str_repeat('cd', 32)), $seg) === null, 'assinatura com outro segredo recusada');
     $alterado = $h . '.' . b64url('{"sub":8,"cli":9,"iat":1700000000}') . '.' . $s;
     verifica(jwtValidar($alterado, $seg) === null, 'payload alterado recusado');
+    // Revisão final I1: o último carácter da assinatura só usa 2 bits; nenhuma outra letra pode passar
+    $aceites = 0;
+    foreach (str_split('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_') as $c) {
+        if ($c === $s[-1]) continue;
+        if (jwtValidar($h . '.' . $p . '.' . substr($s, 0, -1) . $c, $seg) !== null) $aceites++;
+    }
+    verifica($aceites === 0, "nenhuma assinatura com o último carácter trocado é aceite ($aceites aceites)");
     foreach (['', 'a.b', 'a.b.c.d', '!!!.###.$$$', $h . '.' . $p . '.'] as $mau) {
         verifica(jwtValidar($mau, $seg) === null, 'JWT mal formado recusado: "' . substr($mau, 0, 12) . '"');
     }
