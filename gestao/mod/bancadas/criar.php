@@ -8,7 +8,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirecionar(urlModulo('bancadas', 'l
 $nome = trim($_POST['nome'] ?? '');
 $barbeiro_id = !empty($_POST['barbeiro_id']) ? (int)$_POST['barbeiro_id'] : null;
 
-(new Bancada($pdo, $bid))->create($nome, $barbeiro_id);   // objects/Bancada.php
-
-flash('sucesso', 'Bancada criada com sucesso!');
+try {
+    (new Bancada($pdo, $bid))->create($nome, $barbeiro_id);   // objects/Bancada.php (valida o barbeiro)
+    flash('sucesso', 'Bancada criada com sucesso!');
+} catch (InvalidArgumentException $e) {
+    flash('erro', 'Escolhe um barbeiro desta barbearia.');
+}
 redirecionar(urlModulo('bancadas', 'listar'));
