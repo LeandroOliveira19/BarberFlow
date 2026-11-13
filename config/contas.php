@@ -52,6 +52,51 @@ function iniciarSessaoUtilizador(array $u): void {
     $_SESSION['precisa_alterar_password'] = (int)($u['precisa_alterar_password'] ?? 0);
 }
 
+/* ---------- Senhas e códigos de segurança por email ---------- */
+
+const CODIGO_SEG_VALIDADE_MIN = 15;
+const CODIGO_SEG_MAX_TENTATIVAS = 5;
+
+/** Mínimo 8 caracteres, com pelo menos uma letra e um algarismo. */
+function senhaValida(string $s): bool {
+    return mb_strlen($s) >= 8 && preg_match('/\p{L}/u', $s) && preg_match('/\d/', $s);
+}
+
+const SENHA_REGRA = 'A senha tem de ter pelo menos 8 caracteres, com letras e números.';
+
+/** Cria um código de 6 dígitos (só o hash fica na BD) e invalida os anteriores da mesma finalidade. */
+function criarCodigoSeguranca(PDO $pdo, int $uid, string $finalidade): string {
+    $pdo->prepare("UPDATE codigos_seguranca SET usado = 1 WHERE utilizador_id = ? AND finalidade = ? AND usado = 0")
+        ->execute([$uid, $finalidade]);
+    $codigo = str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+    $pdo->prepare("INSERT INTO codigos_seguranca (utilizador_id, finalidade, codigo_hash, expira_em)
+                   VALUES (?, ?, ?, NOW() + INTERVAL " . CODIGO_SEG_VALIDADE_MIN . " MINUTE)")
+        ->execute([$uid, $finalidade, password_hash($codigo, PASSWORD_DEFAULT)]);
+    return $codigo;
+}
+
+/** Valida e gasta o código (uso único). Cada erro conta; ao 5.º erro o código deixa de servir. */
+function validarCodigoSeguranca(PDO $pdo, int $uid, string $finalidade, string $codigo): bool {
+    $st = $pdo->prepare("SELECT id, codigo_hash, tentativas FROM codigos_seguranca
+                         WHERE utilizador_id = ? AND finalidade = ? AND usado = 0 AND expira_em > NOW()
+                         ORDER BY id DESC LIMIT 1");
+    $st->execute([$uid, $finalidade]);
+    $c = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$c || (int)$c['tentativas'] >= CODIGO_SEG_MAX_TENTATIVAS) return false;
+    if (preg_match('/^\d{6}$/', $codigo) && password_verify($codigo, $c['codigo_hash'])) {
+        $pdo->prepare("UPDATE codigos_seguranca SET usado = 1 WHERE id = ?")->execute([(int)$c['id']]);
+        return true;
+    }
+    $pdo->prepare("UPDATE codigos_seguranca SET tentativas = tentativas + 1 WHERE id = ?")->execute([(int)$c['id']]);
+    return false;
+}
+
+/** Grava a senha nova (hash) e tira a obrigação de a mudar. */
+function definirSenha(PDO $pdo, int $uid, string $senha): void {
+    $pdo->prepare("UPDATE utilizadores SET password_hash = ?, precisa_alterar_password = 0 WHERE id = ?")
+        ->execute([password_hash($senha, PASSWORD_DEFAULT), $uid]);
+}
+
 /** Cookie "Lembrar o meu email": só o email, nunca a senha. */
 function guardarCookieEmail(?string $email): void {
     $opcoes = ['path' => '/', 'httponly' => true, 'samesite' => 'Lax',

@@ -139,8 +139,10 @@ function teste_agenda_perfil(): void {
     ok($r['status'] === 302 && str_contains($r['local'], 'm=perfil') && str_contains($r['local'], 'force=1'), 'com password por alterar, perfil/ação inválida → perfil (não o dashboard)', $r);
     $r = $f->get('gestao/index.php?m=perfil&a=editar&force=1');
     ok($r['status'] === 200 && str_contains($r['html'], 'Obrigatório'), 'perfil mostra a alteração obrigatória', $r);
+    // A alteração obrigatória também passa pelo código enviado por email (em modo dev aparece no ecrã)
+    $codigo = pedirCodigoSenha($f, Sessao::csrf($r['html']), true);
     $r = $f->post('gestao/index.php?m=perfil&a=alterar_password', [
-        'nova_password' => TESTE_PASSWORD, 'confirmar_password' => TESTE_PASSWORD, 'csrf' => Sessao::csrf($r['html'])]);
+        'codigo' => $codigo, 'nova_password' => TESTE_PASSWORD, 'confirmar_password' => TESTE_PASSWORD, 'csrf' => Sessao::csrf($r['html'])]);
     $flag = (int)$pdo->query("SELECT precisa_alterar_password FROM utilizadores WHERE email = '" . TESTE_BARBEIRO . "'")->fetchColumn();
     ok($flag === 0, 'alterar password limpa a obrigação', $r);
     $r = $f->get('gestao/index.php?m=agenda&a=listar');
@@ -380,6 +382,74 @@ function teste_2fa_perfil(): void {
     }
 }
 
+/* ===================== Requisitos web: mudar e recuperar a senha com código por email ===================== */
+/** Pede o código no Perfil e lê-o do ecrã (modo dev: api_dev_devolver_codigo na BD local). */
+function pedirCodigoSenha(Sessao $s, string $csrf, bool $forcado = false): string {
+    $s->post('gestao/index.php?m=perfil&a=enviar_codigo', ['csrf' => $csrf]);
+    $r = $s->get('gestao/index.php?m=perfil&a=editar' . ($forcado ? '&force=1' : ''));
+    return preg_match('/Código: (\d{6})/', $r['html'], $m) ? $m[1] : '';
+}
+
+function senhaFunciona(string $email, string $senha): bool {
+    global $BASE;
+    return (new Sessao($BASE))->login($email, $senha);
+}
+
+function teste_senha_com_codigo(): void {
+    global $BASE, $pdo;
+    $repor = fn() => $pdo->prepare("UPDATE utilizadores SET password_hash = ? WHERE email = ?")->execute([password_hash(TESTE_PASSWORD, PASSWORD_DEFAULT), TESTE_GESTOR]);
+    $limparTent = fn() => $pdo->exec("DELETE FROM tentativas_login WHERE email = '" . TESTE_GESTOR . "'");
+    try {
+        $g = new Sessao($BASE); $g->login(TESTE_GESTOR);
+        $r = $g->get('gestao/index.php?m=perfil&a=editar');
+        ok(str_contains($r['html'], 'Enviar código'), 'Perfil tem "Enviar código" para mudar a senha', $r);
+        $csrf = Sessao::csrf($r['html']);
+        $codigo = pedirCodigoSenha($g, $csrf);
+        ok(preg_match('/^\d{6}$/', $codigo) === 1, 'o código aparece no ecrã em modo dev');
+        $n = (int)$pdo->query("SELECT COUNT(*) FROM codigos_seguranca cs JOIN utilizadores u ON u.id = cs.utilizador_id WHERE u.email = '" . TESTE_GESTOR . "' AND cs.usado = 0 AND cs.codigo_hash <> '$codigo'")->fetchColumn();
+        ok($n === 1, 'o código fica guardado só como hash');
+
+        $errado = $codigo === '000000' ? '111111' : '000000';
+        $g->post('gestao/index.php?m=perfil&a=alterar_password', ['codigo' => $errado, 'nova_password' => 'Nova!2026x', 'confirmar_password' => 'Nova!2026x', 'csrf' => $csrf]);
+        ok(senhaFunciona(TESTE_GESTOR, TESTE_PASSWORD), 'código errado não muda a senha');
+        $g->post('gestao/index.php?m=perfil&a=alterar_password', ['codigo' => $codigo, 'nova_password' => 'abc', 'confirmar_password' => 'abc', 'csrf' => $csrf]);
+        $r = $g->get('gestao/index.php?m=perfil&a=editar');
+        ok(senhaFunciona(TESTE_GESTOR, TESTE_PASSWORD) && str_contains($r['html'], '8 caracteres'), 'senha fraca recusada com mensagem', $r);
+        $g->post('gestao/index.php?m=perfil&a=alterar_password', ['codigo' => $codigo, 'nova_password' => 'Nova!2026x', 'confirmar_password' => 'Nova!2026x', 'csrf' => $csrf]);
+        ok(senhaFunciona(TESTE_GESTOR, 'Nova!2026x'), 'código certo muda a senha');
+        $repor();
+        $g->post('gestao/index.php?m=perfil&a=alterar_password', ['codigo' => $codigo, 'nova_password' => 'Outra!2026x', 'confirmar_password' => 'Outra!2026x', 'csrf' => $csrf]);
+        ok(senhaFunciona(TESTE_GESTOR, TESTE_PASSWORD), 'o mesmo código não serve duas vezes');
+
+        // 5 códigos errados gastam o código, mesmo que depois chegue o certo
+        $codigo = pedirCodigoSenha($g, $csrf);
+        for ($i = 0; $i < 5; $i++) {
+            $g->post('gestao/index.php?m=perfil&a=alterar_password', ['codigo' => $codigo === '000000' ? '111111' : '000000', 'nova_password' => 'Nova!2026x', 'confirmar_password' => 'Nova!2026x', 'csrf' => $csrf]);
+        }
+        $g->post('gestao/index.php?m=perfil&a=alterar_password', ['codigo' => $codigo, 'nova_password' => 'Nova!2026x', 'confirmar_password' => 'Nova!2026x', 'csrf' => $csrf]);
+        ok(senhaFunciona(TESTE_GESTOR, TESTE_PASSWORD), 'depois de 5 códigos errados o certo já não serve');
+
+        // Recuperar a senha (Review Focus 4: a resposta não revela se o email existe)
+        $a = new Sessao($BASE);
+        $f = $a->get('gestao/recuperar.php');
+        ok($f['status'] === 200 && str_contains($f['html'], 'name="email"'), 'recuperar.php pede o email', $f);
+        $r1 = $a->post('gestao/recuperar.php', ['email' => 'nao.existe.rotas@example.com', 'csrf' => Sessao::csrf($f['html'])]);
+        $b = new Sessao($BASE);
+        $f = $b->get('gestao/recuperar.php');
+        $r2 = $b->post('gestao/recuperar.php', ['email' => TESTE_GESTOR, 'csrf' => Sessao::csrf($f['html'])]);
+        ok($r1['status'] === $r2['status'] && $r1['local'] === $r2['local'] && $r1['html'] === $r2['html'], 'email inexistente e existente têm a mesma resposta', $r2);
+        $p2 = $b->get('gestao/recuperar.php?passo=2');
+        $codigo = preg_match('/Código: (\d{6})/', $p2['html'], $m) ? $m[1] : '';
+        ok($codigo !== '' && str_contains($p2['html'], 'name="codigo"'), 'passo 2 pede o código (em modo dev mostra-o)', $p2);
+        $r = $b->post('gestao/recuperar.php?passo=2', ['email' => TESTE_GESTOR, 'codigo' => $codigo, 'nova_password' => 'Recup!2026x', 'confirmar_password' => 'Recup!2026x', 'csrf' => Sessao::csrf($p2['html'])]);
+        ok($r['status'] === 302 && str_contains($r['local'], 'login.php') && senhaFunciona(TESTE_GESTOR, 'Recup!2026x'), 'recuperar com o código muda a senha e volta ao login', $r);
+    } finally {
+        $repor();
+        $limparTent();
+        $pdo->exec("DELETE cs FROM codigos_seguranca cs JOIN utilizadores u ON u.id = cs.utilizador_id WHERE u.email IN ('" . TESTE_GESTOR . "','" . TESTE_BARBEIRO . "')");
+    }
+}
+
 /* ===================== Task 5: stock e pedidos ===================== */
 function teste_stock_pedidos(): void {
     global $BASE, $pdo;
@@ -480,7 +550,7 @@ function teste_publico(): void {
 try {
     criarUtilizadoresTeste($pdo);
     foreach (['teste_modular_helpers', 'teste_gestao_base', 'teste_agenda_perfil', 'teste_modulos_gestor',
-              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda', 'teste_login_seguro', 'teste_2fa_perfil'] as $t) {
+              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda', 'teste_login_seguro', 'teste_2fa_perfil', 'teste_senha_com_codigo'] as $t) {
         if (function_exists($t)) { echo "--- $t\n"; $t(); }
     }
 } finally {
