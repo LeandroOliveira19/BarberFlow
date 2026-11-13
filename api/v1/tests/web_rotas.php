@@ -341,6 +341,45 @@ function teste_login_seguro(): void {
     }
 }
 
+/* ===================== Requisitos web: ativar/desativar 2FA no Perfil ===================== */
+function totpAtivo(PDO $pdo, string $email): int {
+    $st = $pdo->prepare("SELECT totp_ativo FROM utilizadores WHERE email = ?");
+    $st->execute([$email]);
+    return (int)$st->fetchColumn();
+}
+
+function teste_2fa_perfil(): void {
+    global $BASE, $pdo;
+    require_once __DIR__ . '/../../../config/totp.php';
+    try {
+        $g = new Sessao($BASE); $g->login(TESTE_GESTOR);
+        $r = $g->get('gestao/index.php?m=perfil&a=editar');
+        preg_match('/id="chave2fa"[^>]*>([A-Z2-7]{16,})</', $r['html'], $m);
+        $chave = $m[1] ?? '';
+        ok(str_contains($r['html'], 'Ativar 2FA') && $chave !== '' && str_contains($r['html'], 'assets/js/qrcode.js'), 'Perfil mostra "Ativar 2FA", a chave e o QR', $r);
+
+        $r = $g->post('gestao/index.php?m=perfil&a=ativar_dois_fatores', ['codigo' => '000000', 'csrf' => Sessao::csrf($r['html'])]);
+        ok(totpAtivo($pdo, TESTE_GESTOR) === 0, 'código errado não ativa o 2FA', $r);
+        $r = $g->get('gestao/index.php?m=perfil&a=editar');
+        $r = $g->post('gestao/index.php?m=perfil&a=ativar_dois_fatores', ['codigo' => totpCodigo($chave, time()), 'csrf' => Sessao::csrf($r['html'])]);
+        ok(totpAtivo($pdo, TESTE_GESTOR) === 1 && $r['status'] === 302, 'código certo ativa o 2FA', $r);
+
+        $s = new Sessao($BASE);
+        ok(!$s->login(TESTE_GESTOR) && str_contains($s->ultima['html'] ?? '', 'name="codigo_2fa"'), 'o login seguinte pede o código da app', $s->ultima);
+        ok($s->login(TESTE_GESTOR, TESTE_PASSWORD, totpCodigo($chave, time())), 'e entra com o código', $s->ultima);
+
+        $r = $g->get('gestao/index.php?m=perfil&a=editar');
+        ok(str_contains($r['html'], 'Desativar 2FA'), 'com 2FA ativo o Perfil mostra "Desativar 2FA"', $r);
+        $csrf = Sessao::csrf($r['html']);
+        $g->post('gestao/index.php?m=perfil&a=desativar_dois_fatores', ['password' => 'errada', 'codigo' => totpCodigo($chave, time()), 'csrf' => $csrf]);
+        ok(totpAtivo($pdo, TESTE_GESTOR) === 1, 'desativar com a senha errada é recusado');
+        $g->post('gestao/index.php?m=perfil&a=desativar_dois_fatores', ['password' => TESTE_PASSWORD, 'codigo' => totpCodigo($chave, time()), 'csrf' => $csrf]);
+        ok(totpAtivo($pdo, TESTE_GESTOR) === 0, 'desativar com senha e código desliga o 2FA');
+    } finally {
+        $pdo->prepare("UPDATE utilizadores SET totp_segredo = NULL, totp_ativo = 0 WHERE email = ?")->execute([TESTE_GESTOR]);
+    }
+}
+
 /* ===================== Task 5: stock e pedidos ===================== */
 function teste_stock_pedidos(): void {
     global $BASE, $pdo;
@@ -441,7 +480,7 @@ function teste_publico(): void {
 try {
     criarUtilizadoresTeste($pdo);
     foreach (['teste_modular_helpers', 'teste_gestao_base', 'teste_agenda_perfil', 'teste_modulos_gestor',
-              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda', 'teste_login_seguro'] as $t) {
+              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda', 'teste_login_seguro', 'teste_2fa_perfil'] as $t) {
         if (function_exists($t)) { echo "--- $t\n"; $t(); }
     }
 } finally {
