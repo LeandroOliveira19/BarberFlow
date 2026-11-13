@@ -32,8 +32,22 @@ class Bancada {
         return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
+    /** O barbeiro existe, está ativo e é DESTA barbearia (nunca se liga uma bancada a um barbeiro de outra). */
+    public function barbeiroValido(int $barbeiroId): bool {
+        $stmt = $this->conn->prepare("SELECT 1 FROM utilizadores WHERE id = ? AND barbearia_id = ? AND tipo = 'barbeiro' AND ativo = 1");
+        $stmt->execute([$barbeiroId, $this->barbearia_id]);
+        return (bool)$stmt->fetchColumn();
+    }
+
+    private function exigirBarbeiroValido(?int $barbeiroId): void {
+        if ($barbeiroId && !$this->barbeiroValido($barbeiroId)) {
+            throw new InvalidArgumentException('Barbeiro inválido para esta barbearia.');
+        }
+    }
+
     /** Cria a bancada; sem nome usa "Bancada N" (N = maior id + 1). */
     public function create(string $nome, ?int $barbeiroId): int {
+        $this->exigirBarbeiroValido($barbeiroId);
         if ($nome === '') {
             $stmt = $this->conn->prepare("SELECT MAX(id) FROM {$this->table_name} WHERE barbearia_id = ?");
             $stmt->execute([$this->barbearia_id]);
@@ -46,6 +60,7 @@ class Bancada {
 
     /** Atualiza nome e barbeiro; um barbeiro só pode ter uma bancada (sai da anterior). */
     public function update(int $id, string $nome, ?int $barbeiroId): void {
+        $this->exigirBarbeiroValido($barbeiroId);
         if ($barbeiroId) {
             $stmt = $this->conn->prepare("UPDATE {$this->table_name} SET barbeiro_id = NULL WHERE barbeiro_id = ? AND barbearia_id = ? AND id != ?");
             $stmt->execute([$barbeiroId, $this->barbearia_id, $id]);

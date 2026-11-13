@@ -9,7 +9,10 @@ $id = (int)($_POST['id'] ?? 0);
 $nome = trim($_POST['nome'] ?? '');
 $barbeiro_id = !empty($_POST['barbeiro_id']) ? (int)$_POST['barbeiro_id'] : null;
 
-(new Bancada($pdo, $bid))->update($id, $nome, $barbeiro_id);   // objects/Bancada.php
-
-flash('sucesso', 'Bancada atualizada com sucesso!');
+try {
+    (new Bancada($pdo, $bid))->update($id, $nome, $barbeiro_id);   // objects/Bancada.php (valida o barbeiro)
+    flash('sucesso', 'Bancada atualizada com sucesso!');
+} catch (InvalidArgumentException $e) {
+    flash('erro', 'Escolhe um barbeiro desta barbearia.');
+}
 redirecionar(urlModulo('bancadas', 'listar'));
