@@ -7,6 +7,14 @@ require_once __DIR__ . '/_comum.php';
 $msg = '';
 $erro = '';
 
+// Título de cada grupo de cards; os já resolvidos ficam fechados para não alongar a página
+$GRUPOS = [
+    'pendente'  => ['titulo' => 'Pendentes',                 'fechado' => false],
+    'aprovado'  => ['titulo' => 'Aprovados — por entregar',  'fechado' => false],
+    'entregue'  => ['titulo' => 'Entregues',                 'fechado' => true],
+    'rejeitado' => ['titulo' => 'Rejeitados',                'fechado' => true],
+];
+
 // =========================================================
 // FILTRO POR ESTADO
 // =========================================================
@@ -18,12 +26,12 @@ if (!array_key_exists($filtro_estado, $ESTADOS)) {
 // =========================================================
 // LISTAGEM DE PEDIDOS
 // =========================================================
-$sql = "SELECT pr.id, pr.quantidade, pr.estado,
+$sql = "SELECT pr.id, pr.quantidade, pr.estado, pr.criado_em,
                m.nome AS material_nome, m.unidade,
                b.nome AS bancada_nome, u.nome AS barbeiro_nome
         FROM pedidos_reposicao pr
-        JOIN materiais m ON pr.material_id = m.id
-        JOIN bancadas b ON pr.bancada_id = b.id
+        JOIN materiais m ON pr.material_id = m.id AND m.barbearia_id = pr.barbearia_id
+        JOIN bancadas b ON pr.bancada_id = b.id AND b.barbearia_id = pr.barbearia_id
         LEFT JOIN utilizadores u ON b.barbeiro_id = u.id
         WHERE pr.barbearia_id = ?";
 $params = [$bid];
@@ -37,25 +45,44 @@ $sql .= " ORDER BY pr.id DESC";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
 $pedidos = $stmt->fetchAll();
+
+$porEstado = [];
+foreach ($pedidos as $p) {
+    $porEstado[$p['estado']][] = $p;
+}
 ?>
 
 <style>
-    .filter-bar { padding: 1rem; background: #1a1a1a; border-bottom: 1px solid var(--border); display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+    .filter-bar { padding: 1rem; background: #1a1a1a; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
     .filter-bar select { padding: 0.6rem 1rem; background: #0a0a0a; border: 1px solid var(--border); border-radius: 6px; color: #fff; }
     .filter-bar button { padding: 0.6rem 1.5rem; background: var(--gold); color: #000; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.3s; }
     .filter-bar button:hover { background: #e0be9a; }
     .btn-limpar { color: var(--muted); text-decoration: none; font-size: 0.85rem; }
     .btn-limpar:hover { color: #fff; }
 
-    .badge { padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; display: inline-block; }
-    .badge.pendente  { color: #fbbf24; background: rgba(251, 191, 36, 0.15); }
     .badge.aprovado  { color: #4ade80; background: rgba(34, 197, 94, 0.15); }
     .badge.entregue  { color: #60a5fa; background: rgba(96, 165, 250, 0.15); }
     .badge.rejeitado { color: #f87171; background: rgba(239, 68, 68, 0.15); }
 
-    .acoes { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
-    .btn-aprovar { text-decoration: none; color: #065f46; background: rgba(34, 197, 94, 0.2); border: 1px solid rgba(34, 197, 94, 0.4); padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; transition: 0.3s; display: inline-block; }
-    .btn-aprovar:hover { background: rgba(34, 197, 94, 0.35); }
+    /* Card de cada pedido: cor da margem segundo o estado */
+    .pedido-card { background: var(--card); border: 1px solid var(--border); border-left: 3px solid #fbbf24; border-radius: 10px; padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.55rem; }
+    .pedido-card.aprovado  { border-left-color: #4ade80; }
+    .pedido-card.entregue  { border-left-color: #60a5fa; }
+    .pedido-card.rejeitado { border-left-color: #f87171; opacity: 0.8; }
+    .pedido-topo { display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; }
+    .pedido-material { font-weight: 500; color: #fff; }
+    .pedido-qtd { font-size: 1.3rem; color: var(--gold); font-weight: 600; }
+    .pedido-qtd small { font-size: 0.8rem; color: var(--muted); font-weight: 400; }
+    .pedido-quem { font-size: 0.85rem; color: #f8f9fa; }
+    .pedido-quem small, .pedido-data { color: var(--muted); font-size: 0.78rem; }
+
+    .grupo-fechado > summary { list-style: none; cursor: pointer; user-select: none; }
+    .grupo-fechado > summary::-webkit-details-marker { display: none; }
+    .grupo-fechado > summary::after { content: '▸'; color: var(--muted); margin-left: auto; transition: transform 0.2s; }
+    .grupo-fechado[open] > summary::after { transform: rotate(90deg); }
+
+    .btn-aprovar { text-decoration: none; color: #4ade80; background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; transition: 0.3s; display: inline-block; }
+    .btn-aprovar:hover { background: rgba(34, 197, 94, 0.3); }
 </style>
 
 <div class="main-content">
@@ -72,78 +99,77 @@ $pedidos = $stmt->fetchAll();
     <?php if ($msg): ?><div class="alerta sucesso"><?= htmlspecialchars($msg) ?></div><?php endif; ?>
     <?php if ($erro): ?><div class="alerta erro"><?= htmlspecialchars($erro) ?></div><?php endif; ?>
 
-    <div class="table-container">
-        <form method="GET" action="index.php" class="filter-bar">
-<input type="hidden" name="m" value="pedidos"><input type="hidden" name="a" value="listar">
-            <select name="estado">
-                <option value="">Todos os estados</option>
-                <?php foreach ($ESTADOS as $valor => $label): ?>
-                    <option value="<?= $valor ?>" <?= $filtro_estado === $valor ? 'selected' : '' ?>><?= $label ?></option>
-                <?php endforeach; ?>
-            </select>
-            <button type="submit">Filtrar</button>
-            <?php if ($filtro_estado !== ''): ?>
-                <a href="<?= e(urlModulo('pedidos', 'listar')) ?>" class="btn-limpar">Limpar</a>
-            <?php endif; ?>
-        </form>
+    <form method="GET" action="index.php" class="filter-bar">
+        <input type="hidden" name="m" value="pedidos"><input type="hidden" name="a" value="listar">
+        <select name="estado">
+            <option value="">Todos os estados</option>
+            <?php foreach ($ESTADOS as $valor => $label): ?>
+                <option value="<?= $valor ?>" <?= $filtro_estado === $valor ? 'selected' : '' ?>><?= $label ?></option>
+            <?php endforeach; ?>
+        </select>
+        <button type="submit">Filtrar</button>
+        <?php if ($filtro_estado !== ''): ?>
+            <a href="<?= e(urlModulo('pedidos', 'listar')) ?>" class="btn-limpar">Limpar</a>
+        <?php endif; ?>
+    </form>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>Material</th>
-                    <th>Quantidade</th>
-                    <th>Bancada / Barbeiro</th>
-                    <th>Estado</th>
-                    <th>Ações</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($pedidos as $p): ?>
-                    <tr>
-                        <td>
-                            <strong><?= htmlspecialchars($p['material_nome']) ?></strong><br>
-                            <small style="color:#666;"><?= htmlspecialchars(strtoupper($p['unidade'] ?? 'un')) ?></small>
-                        </td>
-                        <td><?= (float)$p['quantidade'] ?> <?= htmlspecialchars(strtoupper($p['unidade'] ?? 'un')) ?></td>
-                        <td>
-                            <?= htmlspecialchars($p['bancada_nome'] ?? '-') ?><br>
-                            <small style="color:#666;"><?= htmlspecialchars($p['barbeiro_nome'] ?? 'Livre') ?></small>
-                        </td>
-                        <td>
-                            <span class="badge <?= htmlspecialchars($p['estado']) ?>">
-                                <?= htmlspecialchars($ESTADOS[$p['estado']] ?? $p['estado']) ?>
-                            </span>
-                        </td>
-                        <td>
-                            <div class="acoes">
-                                <?php if ($p['estado'] === 'pendente'): ?>
-                                    <form method="POST" action="<?= e(urlModulo('pedidos', 'aprovar')) ?>" style="display:inline;">
-                                        <?= campoCsrf() ?>
-                                        <input type="hidden" name="id" value="<?= $p['id'] ?>">
-                                        <button type="submit" class="btn-aprovar">Aprovar</button>
-                                    </form>
-                                    <form method="POST" action="<?= e(urlModulo('pedidos', 'rejeitar')) ?>" style="display:inline;">
-                                        <?= campoCsrf() ?>
-                                        <input type="hidden" name="id" value="<?= $p['id'] ?>">
-                                        <button type="submit" class="btn-acao btn-perigo" onclick="return confirm('Rejeitar este pedido?')">Rejeitar</button>
-                                    </form>
-                                <?php elseif ($p['estado'] === 'aprovado'): ?>
-                                    <form method="POST" action="<?= e(urlModulo('pedidos', 'entregar')) ?>" style="display:inline;">
-                                        <?= campoCsrf() ?>
-                                        <input type="hidden" name="id" value="<?= $p['id'] ?>">
-                                        <button type="submit" class="btn-acao">Marcar Entregue</button>
-                                    </form>
-                                <?php else: ?>
-                                    <span style="color: var(--muted); font-size: 0.85rem;">—</span>
-                                <?php endif; ?>
+    <?php if (empty($pedidos)): ?>
+        <div class="sem-cards">Nenhum pedido encontrado.</div>
+    <?php endif; ?>
+
+    <?php foreach ($GRUPOS as $estado => $grupo): ?>
+        <?php if (empty($porEstado[$estado])) continue; ?>
+        <?php
+        $lista = $porEstado[$estado];
+        $fechado = $grupo['fechado'] && $filtro_estado !== $estado;
+        $tagGrupo = $fechado ? 'details' : 'section';
+        $tagTitulo = $fechado ? 'summary' : 'h2';
+        ?>
+        <<?= $tagGrupo ?> class="grupo-cards<?= $fechado ? ' grupo-fechado' : '' ?>">
+            <<?= $tagTitulo ?> class="grupo-cards-titulo">
+                <?= e($grupo['titulo']) ?>
+                <span class="n"><?= count($lista) ?> <?= count($lista) === 1 ? 'pedido' : 'pedidos' ?></span>
+            </<?= $tagTitulo ?>>
+            <div class="cards-grid">
+                <?php foreach ($lista as $p): ?>
+                    <?php $unidade = strtoupper($p['unidade'] ?? 'un'); ?>
+                    <div class="pedido-card <?= e($p['estado']) ?>">
+                        <div class="pedido-topo">
+                            <span class="pedido-material"><?= e($p['material_nome']) ?></span>
+                            <span class="badge <?= e($p['estado']) ?>"><?= e($ESTADOS[$p['estado']] ?? $p['estado']) ?></span>
+                        </div>
+                        <div class="pedido-qtd"><?= (float)$p['quantidade'] ?> <small><?= e($unidade) ?></small></div>
+                        <div class="pedido-quem">
+                            <?= e($p['bancada_nome'] ?? '-') ?>
+                            <small>· <?= e($p['barbeiro_nome'] ?? 'Livre') ?></small>
+                        </div>
+                        <div class="pedido-data">Pedido a <?= e(date('d/m/Y H:i', strtotime((string)$p['criado_em']))) ?></div>
+
+                        <?php if ($p['estado'] === 'pendente'): ?>
+                            <div class="item-acoes">
+                                <form method="POST" action="<?= e(urlModulo('pedidos', 'aprovar')) ?>" style="display:inline;">
+                                    <?= campoCsrf() ?>
+                                    <input type="hidden" name="id" value="<?= $p['id'] ?>">
+                                    <button type="submit" class="btn-aprovar">Aprovar</button>
+                                </form>
+                                <form method="POST" action="<?= e(urlModulo('pedidos', 'rejeitar')) ?>" style="display:inline;">
+                                    <?= campoCsrf() ?>
+                                    <input type="hidden" name="id" value="<?= $p['id'] ?>">
+                                    <button type="submit" class="btn-acao btn-perigo" onclick="return confirm('Rejeitar este pedido?')">Rejeitar</button>
+                                </form>
                             </div>
-                        </td>
-                    </tr>
+                        <?php elseif ($p['estado'] === 'aprovado'): ?>
+                            <div class="item-acoes">
+                                <form method="POST" action="<?= e(urlModulo('pedidos', 'entregar')) ?>" style="display:inline;">
+                                    <?= campoCsrf() ?>
+                                    <input type="hidden" name="id" value="<?= $p['id'] ?>">
+                                    <button type="submit" class="btn-acao">Marcar Entregue</button>
+                                </form>
+                            </div>
+                        <?php endif; ?>
+                    </div>
                 <?php endforeach; ?>
-                <?php if (empty($pedidos)): ?>
-                    <tr><td colspan="5" style="text-align:center; padding: 3rem; color: var(--muted);">Nenhum pedido encontrado.</td></tr>
-                <?php endif; ?>
-            </tbody>
-        </table>
-    </div>
+            </div>
+        </<?= $tagGrupo ?>>
+    <?php endforeach; ?>
 </div>

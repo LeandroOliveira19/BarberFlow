@@ -26,6 +26,18 @@ if (isset($_GET['editar'])) {
 $bancadas            = $bancada->read();
 $barbeiros_livres    = $bancada->barbeirosLivres((int)($editar['id'] ?? 0));
 $materiaisPorBancada = $bancada->materiaisPorBancada();
+
+// Em falta: quantidade no mínimo ou abaixo. Conta por bancada para pôr primeiro as que precisam de reposição.
+$emFaltaItem = fn(array $i): bool => (float)$i['quantidade'] <= (float)$i['quantidade_minima'];
+$faltasPorBancada = [];
+foreach ($materiaisPorBancada as $idBancada => $grupos) {
+    foreach ($grupos as $tipoMat => $itens) {
+        usort($itens, fn($a, $b) => $emFaltaItem($b) <=> $emFaltaItem($a));
+        $materiaisPorBancada[$idBancada][$tipoMat] = $itens;
+        $faltasPorBancada[$idBancada] = ($faltasPorBancada[$idBancada] ?? 0) + count(array_filter($itens, $emFaltaItem));
+    }
+}
+usort($bancadas, fn($a, $b) => [(int)$b['ativo'], $faltasPorBancada[(int)$b['id']] ?? 0] <=> [(int)$a['ativo'], $faltasPorBancada[(int)$a['id']] ?? 0]);
 ?>
 
 <style>
@@ -39,21 +51,25 @@ $materiaisPorBancada = $bancada->materiaisPorBancada();
     .card-head .barbeiro { color: var(--gold); font-size: 0.85rem; margin-top: 0.25rem; }
     .head-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; flex: none; }
 
-    .card-body { max-height: 320px; overflow-y: auto; padding: 0.4rem 1.4rem 1rem; }
-    .card-body::-webkit-scrollbar { width: 8px; }
-    .card-body::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 4px; }
+    .card-body { padding: 0.8rem 1.4rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
 
-    .grupo-titulo { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold); margin: 1rem 0 0.3rem; padding-bottom: 0.2rem; border-bottom: 1px solid rgba(255,255,255,0.06); }
-    .grupo-titulo .n { color: var(--muted); font-weight: 400; }
+    /* Categoria fechada: o resumo diz logo se falta alguma coisa; ao clicar mostra os itens */
+    .categoria { border: 1px solid var(--border); border-left: 3px solid #4ade80; border-radius: 8px; background: #0f0f0f; }
+    .categoria.falta { border-left-color: #f87171; }
+    .categoria summary { list-style: none; cursor: pointer; padding: 0.6rem 0.9rem; display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; user-select: none; }
+    .categoria summary::-webkit-details-marker { display: none; }
+    .categoria summary::after { content: '▸'; color: var(--muted); transition: transform 0.2s; }
+    .categoria[open] summary::after { transform: rotate(90deg); }
+    .categoria .cat-nome { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold); }
+    .categoria .cat-resumo { margin-left: auto; font-size: 0.8rem; color: var(--muted); }
+    .categoria.falta .cat-resumo { color: #f87171; }
+    .categoria .cat-itens { padding: 0 0.9rem 0.6rem; }
 
     .mat-linha { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; padding: 0.32rem 0; font-size: 0.88rem; border-bottom: 1px dashed rgba(255,255,255,0.05); }
     .mat-linha:last-child { border-bottom: none; }
     .mat-nome { color: #f8f9fa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .mat-qtd { color: var(--muted); font-size: 0.82rem; white-space: nowrap; display: flex; align-items: center; gap: 0.5rem; }
 
-    .badge { padding: 0.22rem 0.5rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600; display: inline-block; }
-    .ok { color: #4ade80; background: rgba(34, 197, 94, 0.15); }
-    .low { color: #f87171; background: rgba(239, 68, 68, 0.15); }
     .badge-falta { color: #f87171; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); }
 
     .sem-itens { color: var(--muted); font-size: 0.85rem; padding: 0.8rem 0; }
@@ -127,14 +143,7 @@ $materiaisPorBancada = $bancada->materiaisPorBancada();
         <?php foreach ($bancadas as $b): ?>
             <?php
             $grupos = $materiaisPorBancada[(int)$b['id']] ?? [];
-            $totalItens = 0;
-            $emFalta = 0;
-            foreach ($grupos as $itens) {
-                foreach ($itens as $i) {
-                    $totalItens++;
-                    if ((float)$i['quantidade'] <= (float)$i['quantidade_minima']) $emFalta++;
-                }
-            }
+            $emFalta = $faltasPorBancada[(int)$b['id']] ?? 0;
             ?>
             <div class="bancada-card <?= !$b['ativo'] ? 'inativa' : '' ?>">
                 <div class="card-head">
@@ -158,17 +167,28 @@ $materiaisPorBancada = $bancada->materiaisPorBancada();
                     <?php else: ?>
                         <?php foreach ($ORDEM_TIPOS as $tipo): ?>
                             <?php if (empty($grupos[$tipo])) continue; ?>
-                            <div class="grupo-titulo"><?= htmlspecialchars($TIPOS[$tipo]) ?> <span class="n">(<?= count($grupos[$tipo]) ?>)</span></div>
-                            <?php foreach ($grupos[$tipo] as $i): ?>
-                                <?php $baixo = (float)$i['quantidade'] <= (float)$i['quantidade_minima']; ?>
-                                <div class="mat-linha">
-                                    <span class="mat-nome"><?= htmlspecialchars($i['nome']) ?></span>
-                                    <span class="mat-qtd">
-                                        <?= (float)$i['quantidade'] ?> <?= htmlspecialchars(strtoupper($i['unidade'] ?? 'un')) ?>
-                                        <span class="badge <?= $baixo ? 'low' : 'ok' ?>"><?= $baixo ? 'Repor' : 'OK' ?></span>
-                                    </span>
+                            <?php
+                            $nItens = count($grupos[$tipo]);
+                            $nFalta = count(array_filter($grupos[$tipo], $emFaltaItem));
+                            ?>
+                            <details class="categoria<?= $nFalta > 0 ? ' falta' : '' ?>">
+                                <summary>
+                                    <span class="cat-nome"><?= e($TIPOS[$tipo]) ?></span>
+                                    <span class="cat-resumo"><?= $nItens ?> <?= $nItens === 1 ? 'item' : 'itens' ?> · <?= $nFalta > 0 ? $nFalta . ' em falta' : 'tudo OK' ?></span>
+                                </summary>
+                                <div class="cat-itens">
+                                    <?php foreach ($grupos[$tipo] as $i): ?>
+                                        <?php $baixo = $emFaltaItem($i); ?>
+                                        <div class="mat-linha">
+                                            <span class="mat-nome"><?= e($i['nome']) ?></span>
+                                            <span class="mat-qtd">
+                                                <?= (float)$i['quantidade'] ?> <?= e(strtoupper($i['unidade'] ?? 'un')) ?>
+                                                <span class="badge <?= $baixo ? 'low' : 'ok' ?>"><?= $baixo ? 'Repor' : 'OK' ?></span>
+                                            </span>
+                                        </div>
+                                    <?php endforeach; ?>
                                 </div>
-                            <?php endforeach; ?>
+                            </details>
                         <?php endforeach; ?>
                     <?php endif; ?>
                 </div>

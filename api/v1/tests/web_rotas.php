@@ -778,6 +778,35 @@ function teste_stock_pedidos(): void {
 
     $r = $g->get("gestao/index.php?m=stock&a=listar&transferir=$mat");
     ok(str_contains($r['html'], 'Material Rotas') && semErrosPhp($r['html']), 'link Transferir abre o formulário', $r);
+
+    // Cards: um segundo material, em falta, tem de aparecer antes do que está OK
+    $pdo->prepare("INSERT INTO materiais (barbearia_id, nome, unidade, stock_geral, stock_minimo, tipo) VALUES (1, 'Material Rotas Z', 'un', 1, 5, 'material')")->execute();
+    $matZ = (int)$pdo->lastInsertId();
+    $pdo->prepare("INSERT INTO bancada_materiais (bancada_id, material_id, quantidade, quantidade_minima) VALUES (?, ?, 0, 1)")->execute([$banc, $matZ]);
+    array_unshift($GLOBALS['LIMPEZA'], "DELETE FROM pedidos_reposicao WHERE material_id = $matZ", "DELETE FROM bancada_materiais WHERE material_id = $matZ");
+    $GLOBALS['LIMPEZA'][] = "DELETE FROM materiais WHERE id = $matZ";
+
+    $r = $g->get('gestao/index.php?m=stock&a=listar');
+    $h = $r['html'];
+    ok(str_contains($h, 'class="item-card') && str_contains($h, 'Consumíveis') && semErrosPhp($h), 'stock geral: cards por categoria', $r);
+    ok(strpos($h, 'Material Rotas Z') !== false && strpos($h, 'Material Rotas Z') < strpos($h, '>Material Rotas<'), 'stock geral: em falta aparece primeiro', $r);
+    $r = $b->get('gestao/index.php?m=stock&a=listar');
+    $h = $r['html'];
+    ok(str_contains($h, 'class="item-card') && str_contains($h, 'Consumíveis') && semErrosPhp($h), 'minha bancada: cards por categoria', $r);
+    ok(strpos($h, 'Material Rotas Z') !== false && strpos($h, 'Material Rotas Z') < strpos($h, '>Material Rotas<'), 'minha bancada: em falta aparece primeiro', $r);
+    $r = $b->get('gestao/index.php?m=stock&a=listar&q=' . urlencode('%'));
+    ok(!str_contains($r['html'], 'Material Rotas'), 'pesquisa: % é texto literal (likeSeguro)', $r);
+
+    $r = $g->get('gestao/index.php?m=bancadas&a=listar');
+    ok(str_contains($r['html'], 'class="categoria') && str_contains($r['html'], '2 itens · 1 em falta') && semErrosPhp($r['html']), 'bancadas: categoria com resumo de faltas', $r);
+
+    $b->post('gestao/index.php?m=stock&a=pedir_reposicao', ['material_id' => $matZ, 'quantidade' => 4, 'csrf' => $csrfB]);
+    $r = $g->get('gestao/index.php?m=pedidos&a=listar');
+    $h = $r['html'];
+    ok(str_contains($h, 'class="pedido-card') && semErrosPhp($h), 'pedidos: em cards', $r);
+    $pPend = strpos($h, 'Pendentes'); $pZ = strpos($h, 'Material Rotas Z'); $pRej = strpos($h, 'Rejeitados');
+    ok($pPend !== false && $pZ !== false && $pRej !== false && $pPend < $pZ && $pZ < $pRej, 'pedidos: agrupados por estado, pendentes primeiro', $r);
+
     foreach (['stock', 'pedidos'] as $m) {
         $r = $g->get("gestao/$m.php");
         ok($r['status'] === 302 && str_contains($r['local'], "m=$m"), "$m.php antigo redireciona", $r);

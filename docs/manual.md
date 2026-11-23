@@ -54,11 +54,16 @@ Este manual explica como se usa o BarberFlow em cada perfil. Para instalar, ver 
 ### Serviços, Bancadas, Stock, Pedidos, Fornecedores
 - **Serviços:** nome, duração, preço e descrição. "Desativar" esconde-o do site sem apagar o histórico.
 - **Bancadas:** o posto de cada barbeiro e o material que lá está. Só se atribuem barbeiros da tua barbearia.
+  - Cada bancada é um card. Lá dentro, cada categoria (Consumíveis, Produtos, Brindes) aparece fechada com o resumo, por exemplo "5 itens · 2 em falta", e abre ao clicar.
+  - As bancadas com material em falta aparecem primeiro.
 - **Stock:**
-  - materiais e stock geral;
-  - **Transferir** material para uma bancada;
-  - os alertas aparecem quando a quantidade fica abaixo do mínimo.
+  - materiais e stock geral, em cards agrupados por categoria;
+  - cada card mostra o nome, a quantidade e o estado (OK ou Repor), e ao clicar abre o detalhe com **Editar**, **Transferir** e **Desativar**;
+  - **Transferir** envia material para uma bancada;
+  - os materiais em falta (quantidade igual ou abaixo do mínimo) aparecem primeiro e com a margem a vermelho.
 - **Pedidos:** os barbeiros pedem reposição e tu **aprovas** (o material passa do stock geral para a bancada), **rejeitas** ou marcas como **entregue**.
+  - Os pedidos aparecem em cards agrupados por estado: Pendentes, Aprovados (por entregar), Entregues e Rejeitados.
+  - Os grupos já resolvidos (Entregues e Rejeitados) ficam fechados e abrem ao clicar.
 - **Fornecedores:** contactos e NIF.
 
 ### Definições
@@ -82,7 +87,7 @@ Este manual explica como se usa o BarberFlow em cada perfil. Para instalar, ver 
 
 1. **Ativar a conta:** abre o link que o gestor te enviou, escolhe a senha e entra.
 2. **Agenda:** só vês as **tuas** marcações e podes mudar o estado delas.
-3. **Stock:** vês a **tua** bancada e fazes **Pedir reposição** quando falta material.
+3. **Minha Bancada:** vês os materiais da **tua** bancada em cards por categoria, com os que faltam primeiro. Ao clicar num card abre o detalhe, onde fazes **Pedir reposição**.
 4. **Perfil:** dados, fotografia, mudar a senha e 2FA (como o gestor).
 
 O barbeiro **não** tem acesso a serviços, equipa, bancadas, fornecedores, pedidos de outros nem definições. Essas páginas respondem "Página não encontrada".

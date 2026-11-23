@@ -7,6 +7,12 @@ require_once __DIR__ . '/_comum.php';
 $msg = '';
 $erro = '';
 
+// Categorias dos materiais (coluna materiais.tipo), pela ordem em que aparecem
+$CATEGORIAS = [
+    'material' => 'Consumíveis',
+    'produto'  => 'Produtos',
+    'brinde'   => 'Brindes',
+];
 
 // =========================================================
 // FILTROS (GET)
@@ -31,7 +37,7 @@ if ($eGestor && isset($_GET['transferir'])) {
 }
 
 // =========================================================
-// QUERIES DE LISTAGEM
+// QUERIES DE LISTAGEM (os que estão em falta vêm primeiro)
 // =========================================================
 $materiais = [];
 $bancadas_disponiveis = [];
@@ -43,12 +49,12 @@ if ($eGestor) {
     $params = [$bid];
     if ($filtro_busca !== '') {
         $sql .= " AND nome LIKE ?";
-        $params[] = "%{$filtro_busca}%";
+        $params[] = likeSeguro($filtro_busca);
     }
     if ($filtro_estado === 'low') {
         $sql .= " AND stock_geral <= stock_minimo";
     }
-    $sql .= " ORDER BY nome";
+    $sql .= " ORDER BY (stock_geral <= stock_minimo) DESC, nome";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $materiais = $stmt->fetchAll();
@@ -65,24 +71,24 @@ if ($eGestor) {
     $bancadas_disponiveis = $stmt->fetchAll();
 } else {
     if ($bancada_id) {
-        $sql = "SELECT m.id, m.nome, m.unidade, bm.quantidade, bm.quantidade_minima AS stock_minimo
+        $sql = "SELECT m.id, m.nome, m.unidade, m.tipo, bm.quantidade, bm.quantidade_minima AS stock_minimo
                 FROM bancada_materiais bm
                 JOIN materiais m ON bm.material_id = m.id
                 WHERE bm.bancada_id = ? AND m.barbearia_id = ? AND m.ativo = 1";
         $params = [$bancada_id, $bid];
         if ($filtro_busca !== '') {
             $sql .= " AND m.nome LIKE ?";
-            $params[] = "%{$filtro_busca}%";
+            $params[] = likeSeguro($filtro_busca);
         }
         if ($filtro_estado === 'low') {
             $sql .= " AND bm.quantidade <= bm.quantidade_minima";
         }
-        $sql .= " ORDER BY m.nome";
+        $sql .= " ORDER BY (bm.quantidade <= bm.quantidade_minima) DESC, m.nome";
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         $materiais = $stmt->fetchAll();
 
-        // Pedidos pendentes por material (para mostrar estado na tabela)
+        // Pedidos pendentes por material (para mostrar estado no card)
         $stmt = $pdo->prepare("
             SELECT material_id, COUNT(*) AS total
             FROM pedidos_reposicao
@@ -95,6 +101,20 @@ if ($eGestor) {
         }
     }
 }
+
+// Agrupar por categoria, mantendo a ordem da query dentro de cada uma
+$porCategoria = [];
+foreach ($materiais as $m) {
+    $quantidade = $eGestor ? (float)$m['stock_geral'] : (float)$m['quantidade'];
+    $m['qtd'] = $quantidade;
+    $m['em_falta'] = $quantidade <= (float)$m['stock_minimo'];
+    $porCategoria[$m['tipo'] ?? 'material'][] = $m;
+}
+$ordemCategorias = array_merge(
+    array_keys(array_intersect_key($CATEGORIAS, $porCategoria)),
+    array_keys(array_diff_key($porCategoria, $CATEGORIAS))
+);
+$idAberto = (int)($editar['id'] ?? $transferir['id'] ?? 0);
 ?>
 
 <style>
@@ -103,13 +123,9 @@ if ($eGestor) {
     .form-card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); padding: 1.5rem; }
     .form-card h2 { font-size: 1.2rem; margin-bottom: 1.5rem; color: var(--gold); font-family: 'Cinzel', serif; }
     .btn-cancelar { display: block; text-align: center; margin-top: 0.8rem; color: var(--muted); text-decoration: none; font-size: 0.85rem; }
-    .badge { padding: 0.3rem 0.6rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; display: inline-block; }
-    .ok { color: #4ade80; background: rgba(34, 197, 94, 0.15); }
-    .low { color: #f87171; background: rgba(239, 68, 68, 0.15); }
-    .pendente { color: #fbbf24; background: rgba(251, 191, 36, 0.15); }
 
     /* Estilos dos Filtros */
-    .filter-bar { padding: 1rem; background: #1a1a1a; border-bottom: 1px solid var(--border); display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+    .filter-bar { padding: 1rem; background: #1a1a1a; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
     .filter-bar input { flex: 1; min-width: 200px; padding: 0.6rem 1rem; background: #0a0a0a; border: 1px solid var(--border); border-radius: 6px; color: #fff; }
     .filter-bar select { padding: 0.6rem 1rem; background: #0a0a0a; border: 1px solid var(--border); border-radius: 6px; color: #fff; }
     .filter-bar button { padding: 0.6rem 1.5rem; background: var(--gold); color: #000; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.3s; }
@@ -117,12 +133,9 @@ if ($eGestor) {
     .btn-limpar { color: var(--muted); text-decoration: none; font-size: 0.85rem; }
     .btn-limpar:hover { color: #fff; }
 
-    /* Formulário inline de pedido de reposição (barbeiro) */
-    .pedido-form { display: flex; gap: 0.4rem; align-items: center; margin-top: 0.4rem; }
-    .pedido-form input { width: 74px; background: #0a0a0a; border: 1px solid var(--border); color: #fff; padding: 0.35rem 0.5rem; border-radius: 4px; font-size: 0.85rem; }
-
-    /* Ações do gestor */
-    .acoes { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+    /* Formulário de pedido de reposição (barbeiro) */
+    .pedido-form { display: flex; gap: 0.4rem; align-items: center; }
+    .pedido-form input { width: 80px; background: #0a0a0a; border: 1px solid var(--border); color: #fff; padding: 0.4rem 0.5rem; border-radius: 4px; font-size: 0.85rem; }
 </style>
 
 <div class="main-content">
@@ -144,13 +157,11 @@ if ($eGestor) {
             Ainda não tens uma bancada atribuída pelo gestor. Pede-lhe que te associe uma bancada em <strong>Bancadas</strong>.
         </div>
     <?php else: ?>
-        <div class="grid-stock">
-            <!-- Tabela -->
-            <div class="table-container">
-
-                <!-- Barra de Filtros -->
+        <div class="<?= $eGestor ? 'grid-stock' : '' ?>">
+            <!-- Cards por categoria -->
+            <div>
                 <form method="GET" action="index.php" class="filter-bar">
-<input type="hidden" name="m" value="stock"><input type="hidden" name="a" value="listar">
+                    <input type="hidden" name="m" value="stock"><input type="hidden" name="a" value="listar">
                     <input type="text" name="q" value="<?= htmlspecialchars($filtro_busca) ?>" placeholder="Pesquisar por nome...">
                     <select name="estado">
                         <option value="">Todos os estados</option>
@@ -162,68 +173,69 @@ if ($eGestor) {
                     <?php endif; ?>
                 </form>
 
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Material</th>
-                            <th>Unidade</th>
-                            <th><?= $eGestor ? 'Stock Geral' : 'Qtd na Bancada' ?></th>
-                            <th>Mínimo</th>
-                            <?php if ($eGestor): ?><th>Estado</th><?php endif; ?>
-                            <th>Ações</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($materiais as $m): ?>
-                            <?php
-                            if ($eGestor) {
-                                $emFalta = (float)$m['stock_geral'] <= (float)$m['stock_minimo'];
-                            } else {
-                                $emFalta = (float)$m['quantidade'] <= (float)$m['stock_minimo'];
-                            }
-                            ?>
-                            <tr>
-                                <td><strong><?= htmlspecialchars($m['nome']) ?></strong></td>
-                                <td><?= htmlspecialchars(strtoupper($m['unidade'] ?? 'un')) ?></td>
-                                <td><?= $eGestor ? (float)$m['stock_geral'] : (float)$m['quantidade'] ?></td>
-                                <td><?= (float)$m['stock_minimo'] ?></td>
-                                <?php if ($eGestor): ?>
-                                    <td>
-                                        <span class="badge <?= $emFalta ? 'low' : 'ok' ?>">
-                                            <?= $emFalta ? 'Repor' : 'OK' ?>
+                <?php if (empty($materiais)): ?>
+                    <div class="sem-cards">Nenhum item encontrado.</div>
+                <?php endif; ?>
+
+                <?php foreach ($ordemCategorias as $cat): ?>
+                    <?php
+                    $itens = $porCategoria[$cat];
+                    $faltaCat = count(array_filter($itens, fn($i) => $i['em_falta']));
+                    ?>
+                    <section class="grupo-cards">
+                        <h2 class="grupo-cards-titulo">
+                            <?= e($CATEGORIAS[$cat] ?? ucfirst((string)$cat)) ?>
+                            <span class="n">
+                                <?= count($itens) ?> <?= count($itens) === 1 ? 'item' : 'itens' ?>
+                                <?php if ($faltaCat > 0): ?> · <span class="falta"><?= $faltaCat ?> em falta</span><?php endif; ?>
+                            </span>
+                        </h2>
+                        <div class="cards-grid">
+                            <?php foreach ($itens as $m): ?>
+                                <?php $unidade = strtoupper($m['unidade'] ?? 'un'); ?>
+                                <details class="item-card<?= $m['em_falta'] ? ' falta' : '' ?>" <?= (int)$m['id'] === $idAberto ? 'open' : '' ?>>
+                                    <summary>
+                                        <span class="item-nome"><?= e($m['nome']) ?></span>
+                                        <span class="item-resumo">
+                                            <span><?= $m['qtd'] ?> <?= e($unidade) ?></span>
+                                            <span class="selos">
+                                                <?php if (isset($pendentes_por_material[$m['id']])): ?>
+                                                    <span class="badge pendente"><?= $pendentes_por_material[$m['id']] ?> pendente(s)</span>
+                                                <?php endif; ?>
+                                                <span class="badge <?= $m['em_falta'] ? 'low' : 'ok' ?>"><?= $m['em_falta'] ? 'Repor' : 'OK' ?></span>
+                                            </span>
                                         </span>
-                                    </td>
-                                <?php endif; ?>
-                                <td>
-                                    <?php if ($eGestor): ?>
-                                        <div class="acoes">
-                                            <a href="<?= e(urlModulo('stock', 'listar', ['editar' => $m['id']])) ?>" class="btn-acao">Editar</a>
-                                            <a href="<?= e(urlModulo('stock', 'listar', ['transferir' => $m['id']])) ?>" class="btn-acao">Transferir</a>
-                                            <form method="POST" action="<?= e(urlModulo('stock', 'apagar')) ?>" style="display:inline;">
+                                    </summary>
+                                    <div class="item-corpo">
+                                        <dl class="item-dados">
+                                            <div><dt><?= $eGestor ? 'Stock geral' : 'Na bancada' ?></dt><dd><?= $m['qtd'] ?></dd></div>
+                                            <div><dt>Mínimo</dt><dd><?= (float)$m['stock_minimo'] ?></dd></div>
+                                            <div><dt>Unidade</dt><dd><?= e($unidade) ?></dd></div>
+                                        </dl>
+                                        <?php if ($eGestor): ?>
+                                            <div class="item-acoes">
+                                                <a href="<?= e(urlModulo('stock', 'listar', ['editar' => $m['id']])) ?>" class="btn-acao">Editar</a>
+                                                <a href="<?= e(urlModulo('stock', 'listar', ['transferir' => $m['id']])) ?>" class="btn-acao">Transferir</a>
+                                                <form method="POST" action="<?= e(urlModulo('stock', 'apagar')) ?>" style="display:inline;">
+                                                    <?= campoCsrf() ?>
+                                                    <input type="hidden" name="id" value="<?= $m['id'] ?>">
+                                                    <button type="submit" class="btn-acao btn-perigo" onclick="return confirm('Desativar este material?')">Desativar</button>
+                                                </form>
+                                            </div>
+                                        <?php else: ?>
+                                            <form method="POST" action="<?= e(urlModulo('stock', 'pedir_reposicao')) ?>" class="pedido-form">
                                                 <?= campoCsrf() ?>
-                                                <input type="hidden" name="id" value="<?= $m['id'] ?>">
-                                                <button type="submit" class="btn-acao btn-perigo" onclick="return confirm('Desativar este material?')">X</button>
+                                                <input type="hidden" name="material_id" value="<?= $m['id'] ?>">
+                                                <input type="number" name="quantidade" step="0.01" min="0.01" required placeholder="Qtd">
+                                                <button type="submit" class="btn-acao">Pedir Reposição</button>
                                             </form>
-                                        </div>
-                                    <?php else: ?>
-                                        <?php if (isset($pendentes_por_material[$m['id']])): ?>
-                                            <span class="badge pendente"><?= $pendentes_por_material[$m['id']] ?> pendente(s)</span>
                                         <?php endif; ?>
-                                        <form method="POST" action="<?= e(urlModulo('stock', 'pedir_reposicao')) ?>" class="pedido-form">
-                                            <?= campoCsrf() ?>
-                                            <input type="hidden" name="material_id" value="<?= $m['id'] ?>">
-                                            <input type="number" name="quantidade" step="0.01" min="0.01" required placeholder="Qtd">
-                                            <button type="submit" class="btn-acao">Pedir Reposição</button>
-                                        </form>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                        <?php if (empty($materiais)): ?>
-                            <tr><td colspan="<?= $eGestor ? '6' : '5' ?>" style="text-align:center; padding: 3rem; color: var(--muted);">Nenhum item encontrado.</td></tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
+                                    </div>
+                                </details>
+                            <?php endforeach; ?>
+                        </div>
+                    </section>
+                <?php endforeach; ?>
             </div>
 
             <!-- Formulário (Apenas Gestor) -->

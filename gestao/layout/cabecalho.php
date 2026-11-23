@@ -63,6 +63,34 @@ if (count(get_included_files()) === 1) { header('Location: ../index.php'); exit;
         .btn-acao:hover { border-color: var(--gold); color: var(--gold); }
         .btn-perigo:hover { border-color: #f87171; color: #f87171; }
 
+        /* Selos de estado */
+        .badge { padding: 0.22rem 0.55rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; display: inline-block; white-space: nowrap; }
+        .badge.ok { color: #4ade80; background: rgba(34, 197, 94, 0.15); }
+        .badge.low { color: #f87171; background: rgba(239, 68, 68, 0.15); }
+        .badge.pendente { color: #fbbf24; background: rgba(251, 191, 36, 0.15); }
+
+        /* Cards que abrem ao clicar (stock, bancadas, pedidos) */
+        .grupo-cards { margin-bottom: 1.75rem; }
+        .grupo-cards-titulo { display: flex; align-items: baseline; gap: 0.6rem; font-family: 'Cinzel', serif; font-size: 1rem; color: var(--gold); margin-bottom: 0.75rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--border); }
+        .grupo-cards-titulo .n { font-family: 'Outfit', sans-serif; font-size: 0.8rem; color: var(--muted); }
+        .grupo-cards-titulo .n .falta { color: #f87171; }
+        .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.75rem; align-items: start; }
+        .item-card { background: var(--card); border: 1px solid var(--border); border-left: 3px solid #4ade80; border-radius: 10px; }
+        .item-card.falta { border-left-color: #f87171; }
+        .item-card[open] { border-color: rgba(205,164,124,0.45); }
+        .item-card summary { list-style: none; cursor: pointer; padding: 0.8rem 1rem; display: flex; flex-direction: column; gap: 0.4rem; user-select: none; }
+        .item-card summary::-webkit-details-marker { display: none; }
+        .item-card summary:hover .item-nome { color: var(--gold); }
+        .item-nome { font-weight: 500; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: 0.2s; }
+        .item-resumo { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; color: var(--muted); font-size: 0.85rem; }
+        .item-resumo .selos { display: flex; gap: 0.3rem; flex-wrap: wrap; justify-content: flex-end; }
+        .item-corpo { padding: 0.2rem 1rem 1rem; border-top: 1px solid var(--border); }
+        .item-dados { display: grid; grid-template-columns: repeat(auto-fit, minmax(80px, 1fr)); gap: 0.6rem; margin: 0.8rem 0; }
+        .item-dados dt { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+        .item-dados dd { color: #fff; font-size: 0.95rem; }
+        .item-acoes { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+        .sem-cards { color: var(--muted); text-align: center; padding: 3rem 1rem; background: var(--card); border: 1px solid var(--border); border-radius: 12px; }
+
         /* Alertas */
         .alerta { padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-size: 0.9rem; }
         .alerta.sucesso { background: rgba(34, 197, 94, 0.1); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
