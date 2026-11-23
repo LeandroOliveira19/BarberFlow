@@ -83,22 +83,22 @@ $slug = (string)$sl->fetchColumn();
 ?>
 
 <style>
-    .toolbar { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1rem 1.2rem; margin-bottom: 1.5rem; }
+    .toolbar { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; background: var(--card); border: 1px solid var(--border); border-radius: var(--raio); padding: 1rem 1.2rem; margin-bottom: 1.5rem; }
     .tabs, .nav-data { display: flex; gap: 0.4rem; align-items: center; }
-    .tabs a, .nav-data a { color: var(--muted); text-decoration: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.9rem; border: 1px solid transparent; transition: 0.3s; }
+    .tabs a, .nav-data a { color: var(--muted); text-decoration: none; padding: 0.5rem 1rem; border-radius: var(--raio-campo); font-size: 0.9rem; border: 1px solid transparent; transition: 0.3s; }
     .tabs a:hover, .nav-data a:hover { color: var(--gold); }
     .tabs a.active { background: rgba(205,164,124,0.12); color: var(--gold); border-color: rgba(205,164,124,0.3); }
     .intervalo { font-family: 'Cinzel', serif; font-size: 1.05rem; padding: 0 0.6rem; min-width: 160px; text-align: center; }
     .filtros { display: flex; gap: 0.6rem; flex-wrap: wrap; }
-    .filtros select, .filtros input, .filtros button { background: #1b1b1b; color: #f8f9fa; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 0.8rem; font-family: inherit; font-size: 0.9rem; }
+    .filtros select, .filtros input, .filtros button { background: var(--superficie); color: var(--texto); border: 1px solid var(--border); border-radius: var(--raio-campo); padding: 0.5rem 0.8rem; font-family: inherit; font-size: 0.9rem; }
     .filtros button { cursor: pointer; color: var(--gold); border-color: rgba(205,164,124,0.3); }
     .resumo { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
-    .resumo div { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--gold); border-radius: 10px; padding: 1rem 1.2rem; }
+    .resumo div { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--gold); border-radius: 20px; padding: 1rem 1.2rem; }
     .resumo small { display: block; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; }
     .resumo strong { font-size: 1.7rem; font-weight: 500; }
     .dia-titulo { font-family: 'Cinzel', serif; color: var(--gold); font-size: 1.1rem; margin: 2rem 0 0.8rem; }
     .dia-titulo:first-child { margin-top: 0; }
-    .marcacao { display: grid; grid-template-columns: 110px 1fr auto auto; gap: 1.2rem; align-items: center; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.1rem 1.4rem; margin-bottom: 0.7rem; }
+    .marcacao { display: grid; grid-template-columns: 110px 1fr auto auto; gap: 1.2rem; align-items: center; background: var(--card); border: 1px solid var(--border); border-radius: var(--raio); padding: 1.1rem 1.4rem; margin-bottom: 0.7rem; }
     .marcacao.cancelada, .marcacao.expirada { opacity: 0.55; }
     .hora { font-size: 1.3rem; font-weight: 500; }
     .hora small { display: block; font-size: 0.8rem; color: var(--muted); font-weight: 300; }
@@ -106,19 +106,19 @@ $slug = (string)$sl->fetchColumn();
     .cliente span { color: var(--muted); font-size: 0.9rem; }
     .cliente a { color: var(--muted); text-decoration: none; }
     .cliente a:hover { color: var(--gold); }
-    .badge { font-size: 0.78rem; padding: 0.3rem 0.8rem; border-radius: 50px; border: 1px solid; white-space: nowrap; }
+    .badge { font-size: 0.78rem; padding: 0.3rem 0.8rem; border-radius: 999px; border: 1px solid; white-space: nowrap; }
     .badge.pendente_verificacao { color: #fbbf24; border-color: rgba(251,191,36,0.4);  background: rgba(251,191,36,0.08); }
     .badge.confirmada { color: #60a5fa; border-color: rgba(96,165,250,0.4);  background: rgba(96,165,250,0.08); }
     .badge.concluida  { color: #4ade80; border-color: rgba(74,222,128,0.4);  background: rgba(74,222,128,0.08); }
     .badge.cancelada  { color: #f87171; border-color: rgba(248,113,113,0.4); background: rgba(248,113,113,0.08); }
-    .badge.expirada   { color: #9ca3af; border-color: rgba(156,163,175,0.4); background: rgba(156,163,175,0.08); }
+    .badge.expirada   { color: var(--muted); border-color: rgba(156,163,175,0.4); background: rgba(156,163,175,0.08); }
     .notas { display: block; margin-top: 0.35rem; font-style: italic; color: var(--muted); font-size: 0.85rem; }
     .acoes { display: flex; gap: 0.4rem; justify-content: flex-end; }
     .acoes form { display: inline; }
-    .acoes button { background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.8rem; font-family: inherit; font-size: 0.82rem; cursor: pointer; transition: 0.3s; }
+    .acoes button { background: transparent; color: var(--muted); border: 1px solid var(--border); border-radius: var(--raio-campo); padding: 0.4rem 0.8rem; font-family: inherit; font-size: 0.82rem; cursor: pointer; transition: 0.3s; }
     .acoes button:hover { color: var(--gold); border-color: rgba(205,164,124,0.4); }
     .acoes button.perigo:hover { color: #f87171; border-color: rgba(248,113,113,0.4); }
-    .vazio { text-align: center; color: var(--muted); background: var(--card); border: 1px dashed var(--border); border-radius: 12px; padding: 3.5rem 1.5rem; }
+    .vazio { text-align: center; color: var(--muted); background: var(--card); border: 1px dashed var(--border); border-radius: var(--raio); padding: 3.5rem 1.5rem; }
     .vazio a { color: var(--gold); }
     @media (max-width: 900px) { .marcacao { grid-template-columns: 1fr auto; } .acoes { grid-column: 1 / -1; justify-content: flex-start; flex-wrap: wrap; } }
 </style>

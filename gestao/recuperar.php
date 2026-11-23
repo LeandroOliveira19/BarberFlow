@@ -82,27 +82,14 @@ $codigoEcra  = (string)($_SESSION['recuperar_codigo_ecra'] ?? '');
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Recuperar senha — BarberFlow</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Outfit', sans-serif; background: #0a0a0a; color: #f8f9fa; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; }
-        .caixa { background: #121212; padding: 3rem; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08); width: 100%; max-width: 420px; }
-        h1 { font-family: 'Cinzel', serif; color: #cda47c; text-align: center; margin-bottom: 1rem; font-size: 1.6rem; }
-        p.ajuda { color: #9ca3af; font-size: 0.9rem; margin-bottom: 1.5rem; text-align: center; }
-        .input-group { margin-bottom: 1.2rem; }
-        .input-group label { display: block; font-size: 0.9rem; color: #9ca3af; margin-bottom: 0.5rem; }
-        .input-group input { width: 100%; padding: 0.8rem 1rem; background: #1a1a1a; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; color: #fff; font-family: inherit; outline: none; }
-        .input-group input:focus { border-color: #cda47c; }
-        .btn { width: 100%; padding: 1rem; background: #cda47c; color: #0a0a0a; border: none; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer; }
-        .erro, .info { padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-size: 0.9rem; text-align: center; }
-        .erro { background: rgba(248, 113, 113, 0.1); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.2); }
-        .info { background: rgba(205, 164, 124, 0.1); color: #cda47c; border: 1px solid rgba(205, 164, 124, 0.25); }
-        a { display: block; text-align: center; margin-top: 1.2rem; color: #9ca3af; text-decoration: none; font-size: 0.9rem; }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/css/efeitos.css">
+    <link rel="stylesheet" href="../assets/css/entrada-gestao.css">
 </head>
 <body>
+    <div class="gradiente-animado" aria-hidden="true"><span></span><span></span><span></span></div>
     <div class="caixa">
-        <h1>Recuperar senha</h1>
+        <h1 data-stagger>Recuperar senha</h1>
         <?php if ($erro): ?><div class="erro"><?= htmlspecialchars($erro) ?></div><?php endif; ?>
 
         <?php if ($passo === 1): ?>
@@ -143,5 +130,6 @@ $codigoEcra  = (string)($_SESSION['recuperar_codigo_ecra'] ?? '');
         <?php endif; ?>
         <a href="login.php">← Voltar ao login</a>
     </div>
+    <script src="../assets/js/efeitos.js" defer></script>
 </body>
 </html>

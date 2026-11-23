@@ -18,7 +18,7 @@ if ($slug !== '') {
 if (!$barbearia) {
     http_response_code(404);
     echo '<!DOCTYPE html><html lang="pt"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Barbearia não encontrada</title>'
-       . '<body style="font-family:system-ui;background:#0a0a0a;color:#f4f1ec;display:grid;place-items:center;min-height:100vh;text-align:center;padding:2rem">'
+       . '<body style="font-family:system-ui;background:#0a0a0a;color:#f5f5f7;display:grid;place-items:center;min-height:100vh;text-align:center;padding:2rem">'
        . '<div><h1>Barbearia não encontrada</h1><p style="color:#a1a1a6;margin-top:.5rem">Confirma o endereço que recebeste.</p></div></body></html>';
     exit;
 }
@@ -241,11 +241,11 @@ $linkSite = 'index.php?slug=' . rawurlencode($barbearia['slug']);
     <meta name="theme-color" content="<?= e($corFundo) ?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        :root { --bg: <?= e($corFundo) ?>; --primary: <?= e($corPri) ?>; --text: #f4f1ec; --muted: #a1a1a6; --card: rgba(255,255,255,0.04); --border: rgba(255,255,255,0.1); }
-        body { font-family: 'Outfit', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+        :root { --bg: <?= e($corFundo) ?>; --primary: <?= e($corPri) ?>; --text: #f5f5f7; --muted: #86868b; --card: rgba(255,255,255,0.05); --border: rgba(255,255,255,0.08); }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; letter-spacing: -0.011em; min-height: 100vh; -webkit-font-smoothing: antialiased; }
         :focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
         .topo { padding: 1.3rem 5%; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
         .topo a { text-decoration: none; }
@@ -255,25 +255,25 @@ $linkSite = 'index.php?slug=' . rawurlencode($barbearia['slug']);
         main { max-width: 640px; margin: 0 auto; padding: 3rem 5% 5rem; }
         h1 { font-family: 'Cinzel', serif; font-size: clamp(1.7rem, 5vw, 2.3rem); margin-bottom: 0.4rem; }
         .sub { color: var(--muted); margin-bottom: 2.2rem; }
-        .passo { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 1.6rem; margin-bottom: 1.4rem; }
+        .passo { background: var(--card); border: 1px solid var(--border); border-radius: 28px; padding: 1.6rem; margin-bottom: 1.4rem; }
         .passo h2 { font-size: 1.05rem; font-weight: 500; margin-bottom: 1.1rem; }
         .passo h2 span { color: var(--primary); margin-right: 0.4rem; }
         label.campo { display: block; font-size: 0.88rem; color: var(--muted); margin-bottom: 0.9rem; }
-        label.campo select, label.campo input, label.campo textarea { display: block; width: 100%; margin-top: 0.35rem; background: rgba(0,0,0,0.35); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem 0.9rem; font: inherit; font-size: 1rem; }
+        label.campo select, label.campo input, label.campo textarea { display: block; width: 100%; margin-top: 0.35rem; background: rgba(0,0,0,0.35); color: var(--text); border: 1px solid var(--border); border-radius: 14px; padding: 0.8rem 0.9rem; font: inherit; font-size: 1rem; }
         label.campo textarea { resize: vertical; min-height: 70px; }
         label.campo select:focus, label.campo input:focus, label.campo textarea:focus { border-color: var(--primary); outline: none; }
-        .btn { display: inline-block; width: 100%; background: var(--primary); color: var(--bg); border: 2px solid var(--primary); border-radius: 50px; padding: 0.95rem 2rem; font: inherit; font-weight: 600; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer; text-decoration: none; text-align: center; transition: 0.3s; }
+        .btn { display: inline-block; width: 100%; background: var(--primary); color: var(--bg); border: 1px solid var(--primary); border-radius: 999px; padding: 0.85rem 1.6rem; font: inherit; font-weight: 500; font-size: 0.95rem; cursor: pointer; text-decoration: none; text-align: center; transition: 0.3s; }
         .btn:hover { background: transparent; color: var(--primary); }
         .btn-sec { background: transparent; color: var(--primary); }
         .btn-sec:hover { background: var(--primary); color: var(--bg); }
         .slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 0.6rem; }
         .slot { position: relative; }
         .slot input { position: absolute; opacity: 0; pointer-events: none; }
-        .slot span { display: block; text-align: center; padding: 0.7rem 0; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        .slot span { display: block; text-align: center; padding: 0.7rem 0; border: 1px solid var(--border); border-radius: 999px; cursor: pointer; transition: 0.2s; }
         .slot span:hover { border-color: var(--primary); }
         .slot input:checked + span { background: var(--primary); color: var(--bg); border-color: var(--primary); font-weight: 600; }
         .slot input:focus-visible + span { outline: 2px solid var(--primary); outline-offset: 2px; }
-        .aviso { border-radius: 10px; padding: 0.9rem 1.1rem; margin-bottom: 1.4rem; font-size: 0.95rem; }
+        .aviso { border-radius: 14px; padding: 0.9rem 1.1rem; margin-bottom: 1.4rem; font-size: 0.95rem; }
         .aviso.erro { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.4); color: #fca5a5; }
         .aviso.info { background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--muted); }
         .resumo-escolha { color: var(--muted); font-size: 0.92rem; margin-bottom: 1.1rem; }
@@ -281,7 +281,7 @@ $linkSite = 'index.php?slug=' . rawurlencode($barbearia['slug']);
         .ok { text-align: center; padding: 2rem 0; }
         .ok .tick { width: 64px; height: 64px; border-radius: 50%; border: 2px solid var(--primary); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 1.2rem; }
         .ok .tick svg { width: 30px; height: 30px; stroke: var(--primary); fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-        .ok dl { margin: 1.6rem 0 2rem; text-align: left; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem 1.4rem; }
+        .ok dl { margin: 1.6rem 0 2rem; text-align: left; background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 1.2rem 1.4rem; }
         .ok dt { color: var(--muted); font-size: 0.82rem; }
         .ok dd { margin-bottom: 0.8rem; }
         .ok dd:last-child { margin-bottom: 0; }

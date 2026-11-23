@@ -19,7 +19,7 @@ if (isset($_GET['editar'])) {
 <style>
     .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; align-items: start; }
     @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
-    .form-card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); padding: 1.5rem; }
+    .form-card { background: var(--card); border-radius: var(--raio); border: 1px solid var(--border); padding: 1.5rem; }
     .form-card h2 { font-size: 1.2rem; margin-bottom: 1.5rem; color: var(--gold); font-family: 'Cinzel', serif; }
     .btn-cancelar { display: block; text-align: center; margin-top: 0.8rem; color: var(--muted); text-decoration: none; font-size: 0.85rem; }
     .acoes { display: flex; gap: 0.5rem; }

@@ -1,0 +1,60 @@
+/*
+ * Efeitos visuais partilhados pelo site público (layout Clássico) e pelos ecrãs de entrada da gestão.
+ *
+ * 1. Gradiente animado: três manchas de cor desfocadas que se movem devagar.
+ *    As cores derivam de --destaque (a cor do tema), por isso cada barbearia tem o seu fumo.
+ *    Marcação: <div class="gradiente-animado" aria-hidden="true"><span></span><span></span><span></span></div>
+ *
+ * 2. Palavra a palavra: o texto com data-stagger é dividido em palavras por assets/js/efeitos.js;
+ *    cada palavra passa de desfocada para nítida, com um atraso por palavra.
+ *
+ * Só se animam transform, opacity e filter. Com "reduzir movimento" fica tudo parado.
+ */
+
+.gradiente-animado {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    --g1: var(--destaque, #cda47c);
+    --g2: var(--destaque, #cda47c);
+    --g3: var(--destaque, #cda47c);
+}
+@supports (color: color-mix(in oklab, red, blue)) {
+    .gradiente-animado {
+        --g2: color-mix(in oklab, var(--destaque, #cda47c) 55%, #7a3e10);
+        --g3: color-mix(in oklab, var(--destaque, #cda47c) 25%, #000);
+    }
+}
+.gradiente-animado span {
+    position: absolute;
+    width: 60vmax;
+    height: 60vmax;
+    border-radius: 50%;
+    filter: blur(90px);
+    opacity: 0.55;
+    will-change: transform;
+}
+.gradiente-animado span:nth-child(1) { background: var(--g1); top: -25%; left: -15%; animation: gradiente-mover-1 26s ease-in-out infinite alternate; }
+.gradiente-animado span:nth-child(2) { background: var(--g2); bottom: -35%; right: -20%; animation: gradiente-mover-2 22s ease-in-out infinite alternate; }
+.gradiente-animado span:nth-child(3) { background: var(--g3); top: 20%; left: 30%; width: 45vmax; height: 45vmax; opacity: 0.8; animation: gradiente-mover-3 30s ease-in-out infinite alternate; }
+
+@keyframes gradiente-mover-1 { to { transform: translate(25%, 20%) rotate(40deg) scale(1.15); } }
+@keyframes gradiente-mover-2 { to { transform: translate(-30%, -15%) rotate(-30deg) scale(0.9); } }
+@keyframes gradiente-mover-3 { to { transform: translate(-20%, 25%) scale(1.25); } }
+
+/* Palavra a palavra (só depois de o JavaScript dividir o texto: sem JS o texto fica normal) */
+[data-stagger] .palavra {
+    display: inline-block;
+    opacity: 0;
+    filter: blur(10px);
+    transform: translateY(0.35em);
+    transition: opacity 0.6s ease, filter 0.6s ease, transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+    transition-delay: calc(var(--i, 0) * 80ms);
+}
+[data-stagger].visivel .palavra { opacity: 1; filter: none; transform: none; }
+
+@media (prefers-reduced-motion: reduce) {
+    .gradiente-animado span { animation: none; }
+    [data-stagger] .palavra { opacity: 1; filter: none; transform: none; transition: none; }
+}

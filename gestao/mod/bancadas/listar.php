@@ -43,7 +43,7 @@ usort($bancadas, fn($a, $b) => [(int)$b['ativo'], $faltasPorBancada[(int)$b['id'
 <style>
     .bancadas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 1.25rem; align-items: start; }
 
-    .bancada-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+    .bancada-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--raio); overflow: hidden; display: flex; flex-direction: column; }
     .bancada-card.inativa { opacity: 0.55; }
 
     .card-head { padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: 0.8rem; }
@@ -54,7 +54,7 @@ usort($bancadas, fn($a, $b) => [(int)$b['ativo'], $faltasPorBancada[(int)$b['id'
     .card-body { padding: 0.8rem 1.4rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
 
     /* Categoria fechada: o resumo diz logo se falta alguma coisa; ao clicar mostra os itens */
-    .categoria { border: 1px solid var(--border); border-left: 3px solid #4ade80; border-radius: 8px; background: #0f0f0f; }
+    .categoria { border: 1px solid var(--border); border-left: 3px solid #4ade80; border-radius: var(--raio-campo); background: #0f0f0f; }
     .categoria.falta { border-left-color: #f87171; }
     .categoria summary { list-style: none; cursor: pointer; padding: 0.6rem 0.9rem; display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; user-select: none; }
     .categoria summary::-webkit-details-marker { display: none; }
@@ -67,7 +67,7 @@ usort($bancadas, fn($a, $b) => [(int)$b['ativo'], $faltasPorBancada[(int)$b['id'
 
     .mat-linha { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; padding: 0.32rem 0; font-size: 0.88rem; border-bottom: 1px dashed rgba(255,255,255,0.05); }
     .mat-linha:last-child { border-bottom: none; }
-    .mat-nome { color: #f8f9fa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mat-nome { color: var(--texto); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .mat-qtd { color: var(--muted); font-size: 0.82rem; white-space: nowrap; display: flex; align-items: center; gap: 0.5rem; }
 
     .badge-falta { color: #f87171; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); }
@@ -77,13 +77,13 @@ usort($bancadas, fn($a, $b) => [(int)$b['ativo'], $faltasPorBancada[(int)$b['id'
     .card-foot { padding: 0.9rem 1.4rem; border-top: 1px solid var(--border); display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
 
     .form-toggle { margin-bottom: 1.5rem; }
-    .form-toggle summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; background: var(--gold); color: #0a0a0a; font-weight: 700; padding: 0.75rem 1.3rem; border-radius: 8px; transition: 0.25s; user-select: none; }
+    .form-toggle summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; background: var(--gold); color: var(--fundo); font-weight: 700; padding: 0.75rem 1.3rem; border-radius: var(--raio-campo); transition: 0.25s; user-select: none; }
     .form-toggle summary:hover { background: #e0be9a; }
     .form-toggle summary::-webkit-details-marker { display: none; }
-    .form-toggle[open] summary { background: #1a1a1a; color: var(--gold); border: 1px solid var(--gold); }
-    .form-card { background: var(--card); border-radius: 14px; border: 1px solid var(--border); overflow: hidden; max-width: 440px; margin-top: 1.25rem; }
+    .form-toggle[open] summary { background: var(--superficie); color: var(--gold); border: 1px solid var(--gold); }
+    .form-card { background: var(--card); border-radius: var(--raio); border: 1px solid var(--border); overflow: hidden; max-width: 440px; margin-top: 1.25rem; }
     .form-head { display: flex; align-items: center; gap: 0.8rem; padding: 1.1rem 1.5rem; border-bottom: 1px solid var(--border); background: rgba(205,164,124,0.06); }
-    .form-ico { width: 38px; height: 38px; border-radius: 10px; background: rgba(205,164,124,0.15); color: var(--gold); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex: none; }
+    .form-ico { width: 38px; height: 38px; border-radius: 20px; background: rgba(205,164,124,0.15); color: var(--gold); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex: none; }
     .form-head h2 { color: #fff; font-size: 1.1rem; margin: 0; font-family: 'Cinzel', serif; }
     .form-head p { color: var(--muted); font-size: 0.8rem; margin: 0.15rem 0 0; }
     .form-body { padding: 1.5rem; }

@@ -120,22 +120,22 @@ $idAberto = (int)($editar['id'] ?? $transferir['id'] ?? 0);
 <style>
     .grid-stock { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; align-items: start; }
     @media (max-width: 900px) { .grid-stock { grid-template-columns: 1fr; } }
-    .form-card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); padding: 1.5rem; }
+    .form-card { background: var(--card); border-radius: var(--raio); border: 1px solid var(--border); padding: 1.5rem; }
     .form-card h2 { font-size: 1.2rem; margin-bottom: 1.5rem; color: var(--gold); font-family: 'Cinzel', serif; }
     .btn-cancelar { display: block; text-align: center; margin-top: 0.8rem; color: var(--muted); text-decoration: none; font-size: 0.85rem; }
 
     /* Estilos dos Filtros */
-    .filter-bar { padding: 1rem; background: #1a1a1a; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
-    .filter-bar input { flex: 1; min-width: 200px; padding: 0.6rem 1rem; background: #0a0a0a; border: 1px solid var(--border); border-radius: 6px; color: #fff; }
-    .filter-bar select { padding: 0.6rem 1rem; background: #0a0a0a; border: 1px solid var(--border); border-radius: 6px; color: #fff; }
-    .filter-bar button { padding: 0.6rem 1.5rem; background: var(--gold); color: #000; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.3s; }
+    .filter-bar { padding: 1rem; background: var(--superficie); border: 1px solid var(--border); border-radius: var(--raio); margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+    .filter-bar input { flex: 1; min-width: 200px; padding: 0.6rem 1rem; background: var(--fundo); border: 1px solid var(--border); border-radius: var(--raio-campo); color: #fff; }
+    .filter-bar select { padding: 0.6rem 1rem; background: var(--fundo); border: 1px solid var(--border); border-radius: var(--raio-campo); color: #fff; }
+    .filter-bar button { padding: 0.6rem 1.5rem; background: var(--gold); color: #000; border: none; border-radius: var(--raio-campo); font-weight: 600; cursor: pointer; transition: 0.3s; }
     .filter-bar button:hover { background: #e0be9a; }
     .btn-limpar { color: var(--muted); text-decoration: none; font-size: 0.85rem; }
     .btn-limpar:hover { color: #fff; }
 
     /* Formulário de pedido de reposição (barbeiro) */
     .pedido-form { display: flex; gap: 0.4rem; align-items: center; }
-    .pedido-form input { width: 80px; background: #0a0a0a; border: 1px solid var(--border); color: #fff; padding: 0.4rem 0.5rem; border-radius: 4px; font-size: 0.85rem; }
+    .pedido-form input { width: 80px; background: var(--fundo); border: 1px solid var(--border); color: #fff; padding: 0.4rem 0.5rem; border-radius: 999px; font-size: 0.85rem; }
 </style>
 
 <div class="main-content">

@@ -53,9 +53,9 @@ foreach ($pedidos as $p) {
 ?>
 
 <style>
-    .filter-bar { padding: 1rem; background: #1a1a1a; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
-    .filter-bar select { padding: 0.6rem 1rem; background: #0a0a0a; border: 1px solid var(--border); border-radius: 6px; color: #fff; }
-    .filter-bar button { padding: 0.6rem 1.5rem; background: var(--gold); color: #000; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; transition: 0.3s; }
+    .filter-bar { padding: 1rem; background: var(--superficie); border: 1px solid var(--border); border-radius: var(--raio); margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+    .filter-bar select { padding: 0.6rem 1rem; background: var(--fundo); border: 1px solid var(--border); border-radius: var(--raio-campo); color: #fff; }
+    .filter-bar button { padding: 0.6rem 1.5rem; background: var(--gold); color: #000; border: none; border-radius: var(--raio-campo); font-weight: 600; cursor: pointer; transition: 0.3s; }
     .filter-bar button:hover { background: #e0be9a; }
     .btn-limpar { color: var(--muted); text-decoration: none; font-size: 0.85rem; }
     .btn-limpar:hover { color: #fff; }
@@ -65,7 +65,7 @@ foreach ($pedidos as $p) {
     .badge.rejeitado { color: #f87171; background: rgba(239, 68, 68, 0.15); }
 
     /* Card de cada pedido: cor da margem segundo o estado */
-    .pedido-card { background: var(--card); border: 1px solid var(--border); border-left: 3px solid #fbbf24; border-radius: 10px; padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.55rem; }
+    .pedido-card { background: var(--card); border: 1px solid var(--border); border-left: 3px solid #fbbf24; border-radius: 20px; padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.55rem; }
     .pedido-card.aprovado  { border-left-color: #4ade80; }
     .pedido-card.entregue  { border-left-color: #60a5fa; }
     .pedido-card.rejeitado { border-left-color: #f87171; opacity: 0.8; }
@@ -73,7 +73,7 @@ foreach ($pedidos as $p) {
     .pedido-material { font-weight: 500; color: #fff; }
     .pedido-qtd { font-size: 1.3rem; color: var(--gold); font-weight: 600; }
     .pedido-qtd small { font-size: 0.8rem; color: var(--muted); font-weight: 400; }
-    .pedido-quem { font-size: 0.85rem; color: #f8f9fa; }
+    .pedido-quem { font-size: 0.85rem; color: var(--texto); }
     .pedido-quem small, .pedido-data { color: var(--muted); font-size: 0.78rem; }
 
     .grupo-fechado > summary { list-style: none; cursor: pointer; user-select: none; }
@@ -81,7 +81,7 @@ foreach ($pedidos as $p) {
     .grupo-fechado > summary::after { content: '▸'; color: var(--muted); margin-left: auto; transition: transform 0.2s; }
     .grupo-fechado[open] > summary::after { transform: rotate(90deg); }
 
-    .btn-aprovar { text-decoration: none; color: #4ade80; background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem; cursor: pointer; transition: 0.3s; display: inline-block; }
+    .btn-aprovar { text-decoration: none; color: #4ade80; background: rgba(34, 197, 94, 0.15); border: 1px solid rgba(34, 197, 94, 0.4); padding: 0.4rem 0.8rem; border-radius: 999px; font-size: 0.85rem; cursor: pointer; transition: 0.3s; display: inline-block; }
     .btn-aprovar:hover { background: rgba(34, 197, 94, 0.3); }
 </style>
 

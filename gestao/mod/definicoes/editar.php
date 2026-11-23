@@ -20,7 +20,7 @@ function cfg(string $key, string $default = ''): string {
 <style>
     .grid-definicoes { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem; align-items: start; }
     @media (max-width: 900px) { .grid-definicoes { grid-template-columns: 1fr; } }
-    .card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); padding: 2rem; }
+    .card { background: var(--card); border-radius: var(--raio); border: 1px solid var(--border); padding: 2rem; }
     .card h2 { font-family: 'Cinzel', serif; font-size: 1.2rem; color: var(--gold); margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
     .input-group input[type="color"] { padding: 0.2rem; height: 42px; cursor: pointer; }
     .btn-submit { max-width: 300px; margin-left: auto; display: block; font-size: 1rem; }

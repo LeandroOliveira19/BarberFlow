@@ -152,11 +152,11 @@ $restoMin = $m['codigo_expira_em'] ? max(0, (int)ceil((strtotime((string)$m['cod
     <meta name="theme-color" content="<?= e($corFundo) ?>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-        :root { --bg: <?= e($corFundo) ?>; --primary: <?= e($corPri) ?>; --text: #f4f1ec; --muted: #a1a1a6; --card: rgba(255,255,255,0.04); --border: rgba(255,255,255,0.1); }
-        body { font-family: 'Outfit', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; -webkit-font-smoothing: antialiased; }
+        :root { --bg: <?= e($corFundo) ?>; --primary: <?= e($corPri) ?>; --text: #f5f5f7; --muted: #86868b; --card: rgba(255,255,255,0.05); --border: rgba(255,255,255,0.08); }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; letter-spacing: -0.011em; min-height: 100vh; -webkit-font-smoothing: antialiased; }
         :focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
         .topo { padding: 1.3rem 5%; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); }
         .topo a { text-decoration: none; }
@@ -165,20 +165,20 @@ $restoMin = $m['codigo_expira_em'] ? max(0, (int)ceil((strtotime((string)$m['cod
         main { max-width: 560px; margin: 0 auto; padding: 3rem 5% 5rem; }
         h1 { font-family: 'Cinzel', serif; font-size: clamp(1.6rem, 5vw, 2.1rem); margin-bottom: 0.5rem; }
         .sub { color: var(--muted); margin-bottom: 1.8rem; }
-        .caixa { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 1.5rem; margin-bottom: 1.2rem; }
-        dl { margin: 0 0 1.6rem; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.2rem 1.4rem; }
+        .caixa { background: var(--card); border: 1px solid var(--border); border-radius: 28px; padding: 1.5rem; margin-bottom: 1.2rem; }
+        dl { margin: 0 0 1.6rem; background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 1.2rem 1.4rem; }
         dt { color: var(--muted); font-size: 0.82rem; }
         dd { margin-bottom: 0.8rem; }
         dd:last-child { margin-bottom: 0; }
-        input.codigo { width: 100%; text-align: center; letter-spacing: 0.5em; font-size: 1.8rem; padding: 0.8rem; background: rgba(0,0,0,0.35); color: var(--text); border: 1px solid var(--border); border-radius: 10px; font-family: inherit; }
+        input.codigo { width: 100%; text-align: center; letter-spacing: 0.5em; font-size: 1.8rem; padding: 0.8rem; background: rgba(0,0,0,0.35); color: var(--text); border: 1px solid var(--border); border-radius: 14px; font-family: inherit; }
         input.codigo:focus { border-color: var(--primary); outline: none; }
-        .btn { display: block; width: 100%; background: var(--primary); color: var(--bg); border: 2px solid var(--primary); border-radius: 50px; padding: 0.95rem 2rem; font: inherit; font-weight: 600; font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer; text-decoration: none; text-align: center; transition: 0.3s; margin-top: 1rem; }
+        .btn { display: block; width: 100%; background: var(--primary); color: var(--bg); border: 1px solid var(--primary); border-radius: 999px; padding: 0.85rem 1.6rem; font: inherit; font-weight: 500; font-size: 0.95rem; cursor: pointer; text-decoration: none; text-align: center; transition: 0.3s; margin-top: 1rem; }
         .btn:hover { background: transparent; color: var(--primary); }
         .btn-sec { background: transparent; color: var(--primary); }
         .btn-sec:hover { background: var(--primary); color: var(--bg); }
         .link { background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; font: inherit; font-size: 0.9rem; margin-top: 1rem; }
         .link:hover { color: var(--primary); }
-        .aviso { border-radius: 10px; padding: 0.9rem 1.1rem; margin-bottom: 1.2rem; font-size: 0.95rem; }
+        .aviso { border-radius: 14px; padding: 0.9rem 1.1rem; margin-bottom: 1.2rem; font-size: 0.95rem; }
         .aviso.erro { background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.4); color: #fca5a5; }
         .aviso.info { background: rgba(255,255,255,0.04); border: 1px solid var(--border); color: var(--muted); }
         .aviso.dev { background: rgba(251,191,36,0.1); border: 1px dashed rgba(251,191,36,0.5); color: #fcd34d; }

@@ -70,6 +70,8 @@ Este manual explica como se usa o BarberFlow em cada perfil. Para instalar, ver 
 - **Informação pública:** nome, morada, slogan, "Sobre nós", horário.
 - **Cancelar/remarcar na app até:** quantas horas antes o cliente ainda pode alterar sozinho (0 a 168).
 - **Aparência:** tema do site, cores, fonte, imagem principal, galeria e redes sociais.
+  - No tema **Clássico (Escuro)**, o topo do site tem um fumo animado na **cor principal** escolhida e o slogan e os títulos aparecem palavra a palavra. O tema **Minimalista** não tem estes efeitos.
+  - Quem tiver a opção **"reduzir movimento"** ligada no sistema vê tudo parado. O mesmo acontece no ecrã de entrada da gestão.
 
 ### Perfil (gestor e barbeiro)
 - **Dados pessoais:** e a fotografia (JPG, PNG ou WEBP, até 2 MB).

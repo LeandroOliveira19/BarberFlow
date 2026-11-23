@@ -131,16 +131,16 @@ if ($eGestor) {
 
 <style>
     .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem; }
-    .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 1.4rem 1.5rem; border-left: 4px solid var(--gold); }
+    .kpi { background: var(--card); border: 1px solid var(--border); border-radius: var(--raio); padding: 1.4rem 1.5rem; border-left: 4px solid var(--gold); }
     .kpi .label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
     .kpi .valor { font-size: 2rem; font-weight: 600; color: #fff; margin-top: 0.35rem; }
     .kpi .valor small { font-size: 1rem; color: var(--gold); font-weight: 500; }
     .kpi .sub { font-size: 0.78rem; color: #4ade80; margin-top: 0.3rem; }
 
     .alertas { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem; }
-    .alerta-card { display: flex; align-items: center; gap: 1rem; padding: 1.1rem 1.4rem; border-radius: 12px; border: 1px solid var(--border); text-decoration: none; background: var(--card); transition: 0.25s; }
+    .alerta-card { display: flex; align-items: center; gap: 1rem; padding: 1.1rem 1.4rem; border-radius: var(--raio); border: 1px solid var(--border); text-decoration: none; background: var(--card); transition: 0.25s; }
     .alerta-card:hover { border-color: var(--gold); }
-    .alerta-card .ico { width: 42px; height: 42px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex: none; }
+    .alerta-card .ico { width: 42px; height: 42px; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex: none; }
     .alerta-card .num { font-size: 1.6rem; font-weight: 700; line-height: 1; }
     .alerta-card .txt { font-size: 0.8rem; color: var(--muted); }
     .alerta-card .seta { margin-left: auto; color: var(--muted); font-size: 1.2rem; }
@@ -150,26 +150,26 @@ if ($eGestor) {
 
     .painel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
     @media (max-width: 900px) { .painel-grid { grid-template-columns: 1fr; } }
-    .painel { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 1.5rem; }
+    .painel { background: var(--card); border: 1px solid var(--border); border-radius: var(--raio); padding: 1.5rem; }
     .painel h3 { font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--gold); margin: 0 0 1rem; }
 
     .bar-row { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.6rem; font-size: 0.88rem; }
-    .bar-label { width: 45%; color: #f8f9fa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .bar-track { flex: 1; height: 8px; background: #1a1a1a; border-radius: 4px; overflow: hidden; }
-    .bar-fill { height: 100%; background: linear-gradient(90deg, #cda47c, #e0be9a); border-radius: 4px; }
+    .bar-label { width: 45%; color: var(--texto); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bar-track { flex: 1; height: 8px; background: var(--superficie); border-radius: 999px; overflow: hidden; }
+    .bar-fill { height: 100%; background: linear-gradient(90deg, #cda47c, #e0be9a); border-radius: 999px; }
     .bar-val { width: 2rem; text-align: right; color: var(--muted); }
 
     .rank-lista { list-style: none; margin: 0; padding: 0; }
     .rank-lista li { display: flex; align-items: center; gap: 0.7rem; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
     .rank-lista li:last-child { border-bottom: none; }
-    .rank-pos { width: 24px; height: 24px; border-radius: 50%; background: #1a1a1a; color: var(--gold); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex: none; }
-    .rank-nome { color: #f8f9fa; flex: 1; }
+    .rank-pos { width: 24px; height: 24px; border-radius: 50%; background: var(--superficie); color: var(--gold); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex: none; }
+    .rank-nome { color: var(--texto); flex: 1; }
     .rank-total { color: var(--muted); }
 
     .proximas-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
     .proximas-table th { text-align: left; color: var(--muted); font-size: 0.75rem; text-transform: uppercase; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border); }
     .proximas-table td { padding: 0.65rem 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
-    .badge { padding: 0.22rem 0.5rem; border-radius: 4px; font-size: 0.72rem; font-weight: 600; }
+    .badge { padding: 0.22rem 0.5rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
     .badge.confirmada { color: #4ade80; background: rgba(34,197,94,0.15); }
     .badge.pendente_verificacao { color: #fbbf24; background: rgba(251,191,36,0.15); }
     .vazio { color: var(--muted); font-size: 0.9rem; padding: 0.8rem 0; }

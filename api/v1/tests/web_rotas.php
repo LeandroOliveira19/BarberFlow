@@ -848,11 +848,56 @@ function teste_publico(): void {
     ok($r['status'] === 200 && str_contains($r['html'], 'A sessão expirou'), 'marcar sem CSRF mostra "A sessão expirou" (não redireciona)', $r);
 }
 
+/* ===================== Visual "tipo Apple" (efeitos, site Clássico, marcar, gestão) ===================== */
+function teste_visual(): void {
+    global $BASE, $pdo;
+    $s = new Sessao($BASE);
+
+    // Tarefa 1: efeitos partilhados
+    $r = $s->get('assets/css/efeitos.css');
+    ok($r['status'] === 200 && str_contains($r['html'], 'prefers-reduced-motion') && str_contains($r['html'], '.gradiente-animado'), 'efeitos.css existe (gradiente + reduzir movimento)', $r);
+    $r = $s->get('assets/js/efeitos.js');
+    ok($r['status'] === 200 && str_contains($r['html'], 'IntersectionObserver') && str_contains($r['html'], 'aria-label') && !str_contains($r['html'], 'innerHTML'), 'efeitos.js existe (palavra a palavra, sem innerHTML)', $r);
+
+    // Tarefa 2: site Clássico com efeitos; Minimalista intacto; a cor segue o tema
+    $r = $s->get('index.php?slug=rlbarber');
+    $h = $r['html'];
+    ok(str_contains($h, 'assets/css/efeitos.css') && str_contains($h, 'assets/js/efeitos.js') && str_contains($h, 'class="gradiente-animado"') && str_contains($h, 'data-stagger'), 'site Clássico: inclui os efeitos', $r);
+    ok(str_contains($h, 'family=Inter') && !str_contains($h, 'family=Outfit') && semErrosPhp($h), 'site Clássico: texto em Inter', $r);
+    $r = $s->get('index.php?slug=navalha');
+    ok($r['status'] === 200 && !str_contains($r['html'], 'efeitos.css') && !str_contains($r['html'], 'gradiente-animado'), 'site Minimalista: sem efeitos', $r);
+
+    $orig = $pdo->query("SELECT chave, valor FROM configuracoes WHERE barbearia_id = 2 AND chave IN ('tema_layout', 'tema_cor')")->fetchAll(PDO::FETCH_KEY_PAIR);
+    foreach ($orig as $chave => $valor) {
+        $GLOBALS['LIMPEZA'][] = "UPDATE configuracoes SET valor = " . $pdo->quote($valor) . " WHERE barbearia_id = 2 AND chave = " . $pdo->quote($chave);
+    }
+    $pdo->exec("UPDATE configuracoes SET valor = 'classico' WHERE barbearia_id = 2 AND chave = 'tema_layout'");
+    $pdo->exec("UPDATE configuracoes SET valor = '#dc2626' WHERE barbearia_id = 2 AND chave = 'tema_cor'");
+    $r = $s->get('index.php?slug=navalha');
+    ok(str_contains($r['html'], '--destaque: #dc2626') && str_contains($r['html'], 'gradiente-animado'), 'site Clássico de outra barbearia: o destaque segue tema_cor', $r);
+    foreach ($orig as $chave => $valor) {
+        $pdo->prepare("UPDATE configuracoes SET valor = ? WHERE barbearia_id = 2 AND chave = ?")->execute([$valor, $chave]);
+    }
+
+    // Tarefa 3: marcar com o mesmo visual (sem efeitos)
+    $r = $s->get('index.php?m=marcar&a=formulario&slug=rlbarber');
+    ok(str_contains($r['html'], 'family=Inter') && str_contains($r['html'], 'border-radius: 999px') && semErrosPhp($r['html']), 'marcar: Inter e botões em pílula', $r);
+
+    // Tarefa 4: gestão — efeitos só na entrada
+    $r = $s->get('gestao/login.php');
+    ok(str_contains($r['html'], 'assets/css/efeitos.css') && str_contains($r['html'], 'class="gradiente-animado"') && str_contains($r['html'], 'data-stagger'), 'login da gestão: com efeitos', $r);
+    $g = new Sessao($BASE);
+    $g->login(TESTE_GESTOR);
+    $r = $g->get('gestao/index.php');
+    $h = $r['html'];
+    ok(str_contains($h, 'family=Inter') && str_contains($h, '--raio: 28px') && !str_contains($h, 'gradiente-animado') && semErrosPhp($h), 'dashboard: visual novo, sem animações', $r);
+}
+
 /* ===================== Execução ===================== */
 try {
     criarUtilizadoresTeste($pdo);
     foreach (['teste_modular_helpers', 'teste_gestao_base', 'teste_agenda_perfil', 'teste_modulos_gestor',
-              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda', 'teste_login_seguro', 'teste_2fa_perfil', 'teste_senha_com_codigo', 'teste_convite_barbeiro', 'teste_revisao_seguranca', 'teste_auditoria_privilegios', 'teste_cookie_sessao'] as $t) {
+              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda', 'teste_login_seguro', 'teste_2fa_perfil', 'teste_senha_com_codigo', 'teste_convite_barbeiro', 'teste_revisao_seguranca', 'teste_auditoria_privilegios', 'teste_cookie_sessao', 'teste_visual'] as $t) {
         if (function_exists($t)) { echo "--- $t\n"; $t(); }
     }
 } finally {

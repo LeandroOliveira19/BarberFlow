@@ -25,15 +25,15 @@ $segredo2fa = $tem2fa ? '' : (string)$_SESSION['totp_pendente'];
     /* O CSS do perfil que já tinhas mantém-se igual */
     .perfil-layout { display: grid; grid-template-columns: 300px 1fr; gap: 2.5rem; align-items: start; max-width: 1100px; }
     @media (max-width: 900px) { .perfil-layout { grid-template-columns: 1fr; } }
-    .perfil-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; text-align: center; }
-    .avatar-preview { width: 160px; height: 160px; border-radius: 50%; object-fit: cover; border: 3px solid var(--gold); margin: 0 auto 1.5rem; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: var(--gold); font-family: 'Cinzel', serif; background: #1a1a1a; }
+    .perfil-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--raio); padding: 2rem; text-align: center; }
+    .avatar-preview { width: 160px; height: 160px; border-radius: 50%; object-fit: cover; border: 3px solid var(--gold); margin: 0 auto 1.5rem; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: var(--gold); font-family: 'Cinzel', serif; background: var(--superficie); }
     .perfil-card h2 { font-family: 'Cinzel', serif; font-size: 1.4rem; margin-bottom: 0.5rem; }
     .perfil-card p { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.2rem; }
-    .form-section { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 2rem; margin-bottom: 1.5rem; }
+    .form-section { background: var(--card); border: 1px solid var(--border); border-radius: var(--raio); padding: 2rem; margin-bottom: 1.5rem; }
     .form-section h3 { font-family: 'Cinzel', serif; font-size: 1.2rem; color: var(--gold); margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
-    .file-upload-wrapper { border: 2px dashed var(--border); padding: 1rem; border-radius: 8px; text-align: center; transition: 0.3s; }
-    details.password-toggle { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; margin-top: 1rem; }
-    details.password-toggle summary { padding: 1rem; cursor: pointer; font-weight: 500; list-style: none; display: flex; justify-content: space-between; align-items: center; background: #1a1a1a; }
+    .file-upload-wrapper { border: 2px dashed var(--border); padding: 1rem; border-radius: var(--raio-campo); text-align: center; transition: 0.3s; }
+    details.password-toggle { border: 1px solid var(--border); border-radius: var(--raio-campo); overflow: hidden; margin-top: 1rem; }
+    details.password-toggle summary { padding: 1rem; cursor: pointer; font-weight: 500; list-style: none; display: flex; justify-content: space-between; align-items: center; background: var(--superficie); }
     details.password-toggle summary::-webkit-details-marker { display: none; }
     details.password-toggle summary::after { content: '+'; color: var(--gold); font-size: 1.5rem; transition: transform 0.3s; }
     details.password-toggle[open] summary::after { transform: rotate(45deg); }

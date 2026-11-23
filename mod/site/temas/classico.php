@@ -97,7 +97,8 @@ $iconMail  = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✂️</text></svg>">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=<?= e($fonteUrl) ?>:wght@400;600;700&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=<?= e($fonteUrl) ?>:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/css/efeitos.css">
     <script type="application/ld+json"><?= json_encode($ldJson, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) ?></script>
     <noscript><style>.reveal { opacity: 1 !important; transform: none !important; }</style></noscript>
     <style>
@@ -107,14 +108,16 @@ $iconMail  = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M
             --surface: rgba(255, 255, 255, 0.035);
             --surface-light: rgba(255, 255, 255, 0.08);
             --primary: <?= e($corPri) ?>;
-            --text: #f4f1ec;
-            --text-muted: #a1a1a6;
-            --border: rgba(255, 255, 255, 0.09);
+            --destaque: <?= e($corPri) ?>;
+            --text: #f5f5f7;
+            --text-muted: #86868b;
+            --border: rgba(255, 255, 255, 0.08);
+            --raio: 28px;
             --font-heading: '<?= e($fonteTit) ?>', Georgia, serif;
-            --font-body: 'Outfit', system-ui, -apple-system, 'Segoe UI', sans-serif;
+            --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
         }
         html { scroll-behavior: smooth; scroll-padding-top: 80px; }
-        body { font-family: var(--font-body); background: var(--bg); color: var(--text); line-height: 1.7; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+        body { font-family: var(--font-body); background: var(--bg); color: var(--text); line-height: 1.6; letter-spacing: -0.011em; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
         img { max-width: 100%; display: block; }
         ::selection { background: var(--primary); color: var(--bg); }
         :focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
@@ -124,7 +127,7 @@ $iconMail  = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M
         .reveal.active { opacity: 1; transform: none; }
 
         nav { position: fixed; top: 0; left: 0; width: 100%; padding: 1.4rem 5%; display: flex; justify-content: space-between; align-items: center; z-index: 1000; transition: background 0.4s, padding 0.4s, border-color 0.4s; border-bottom: 1px solid transparent; }
-        nav.scrolled, nav.open { background: rgba(10, 10, 10, 0.92); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding: 0.9rem 5%; border-bottom-color: var(--border); }
+        nav.scrolled, nav.open { background: rgba(0, 0, 0, 0.72); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); padding: 0.9rem 5%; border-bottom-color: var(--border); }
         .logo { font-family: var(--font-heading); font-size: 1.5rem; font-weight: 700; color: var(--primary); text-decoration: none; letter-spacing: 0.08em; }
         .nav-right { display: flex; align-items: center; gap: 2rem; }
         .nav-links { display: flex; gap: 2rem; align-items: center; }
@@ -132,47 +135,47 @@ $iconMail  = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M
         .nav-links a::after { content: ''; position: absolute; left: 0; bottom: -4px; width: 100%; height: 1px; background: var(--primary); transform: scaleX(0); transform-origin: left; transition: transform 0.3s; }
         .nav-links a:hover { color: var(--primary); }
         .nav-links a:hover::after { transform: scaleX(1); }
-        .nav-cta { background: var(--primary); color: var(--bg); text-decoration: none; padding: 0.65rem 1.4rem; border-radius: 50px; font-size: 0.85rem; font-weight: 600; border: 1px solid var(--primary); transition: background 0.3s, color 0.3s; }
+        .nav-cta { background: var(--primary); color: var(--bg); text-decoration: none; padding: 0.55rem 1.2rem; border-radius: 999px; font-size: 0.85rem; font-weight: 500; border: 1px solid var(--primary); transition: background 0.3s, color 0.3s; }
         .nav-cta:hover { background: transparent; color: var(--primary); }
-        .nav-toggle { display: none; background: none; border: 1px solid var(--border); color: var(--text); width: 44px; height: 44px; border-radius: 8px; cursor: pointer; align-items: center; justify-content: center; }
+        .nav-toggle { display: none; background: none; border: 1px solid var(--border); color: var(--text); width: 44px; height: 44px; border-radius: 999px; cursor: pointer; align-items: center; justify-content: center; }
         .nav-toggle svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 
         .hero {
+            position: relative; overflow: hidden; isolation: isolate;
             min-height: 100svh; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 7rem 5% 5rem;
             background:
                 radial-gradient(ellipse at center, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.75) 100%),
                 linear-gradient(to bottom, rgba(0,0,0,0.45) 0%, var(--bg) 100%),
                 url("<?= $heroImg ?>") center / cover no-repeat;
         }
-        .hero-tag { display: inline-flex; align-items: center; gap: 1rem; font-size: 0.85rem; color: var(--primary); margin-bottom: 1.8rem; letter-spacing: 0.12em; }
-        .hero-tag::before, .hero-tag::after { content: ''; width: 48px; height: 1px; background: var(--primary); opacity: 0.6; }
-        .hero h1 { font-family: var(--font-heading); font-size: clamp(2.8rem, 8vw, 6rem); letter-spacing: 0.04em; line-height: 1.05; margin-bottom: 1.2rem; text-shadow: 0 4px 30px rgba(0,0,0,0.6); }
-        .hero p { font-size: 1.1rem; color: #cfcfd3; max-width: 560px; margin-bottom: 2.5rem; font-weight: 300; }
-        .hero-buttons { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; }
-        .btn-cta, .btn-cta-outline { padding: 1rem 2.4rem; font-size: 0.88rem; font-weight: 600; text-decoration: none; border-radius: 50px; text-transform: uppercase; letter-spacing: 0.08em; border: 2px solid var(--primary); transition: all 0.3s ease; display: inline-block; }
+        /* Fumo da cor do tema por cima da foto (assets/css/efeitos.css); o conteúdo fica à frente */
+        .hero .gradiente-animado { z-index: -1; mix-blend-mode: screen; opacity: 0.42; }
+        .hero-tag { display: inline-flex; align-items: center; gap: 1rem; font-size: 0.85rem; font-weight: 500; color: var(--primary); margin-bottom: 1.4rem; letter-spacing: 0.02em; }
+        .hero h1 { font-family: var(--font-heading); font-size: clamp(3rem, 9vw, 6rem); letter-spacing: -0.01em; line-height: 1.02; margin-bottom: 1.2rem; text-shadow: 0 4px 30px rgba(0,0,0,0.6); }
+        .hero p { font-size: clamp(1.2rem, 2.4vw, 1.6rem); color: var(--text); max-width: 640px; margin-bottom: 2.4rem; font-weight: 500; letter-spacing: -0.02em; line-height: 1.3; }
+        .hero-buttons { display: flex; gap: 0.8rem; flex-wrap: wrap; justify-content: center; }
+        .btn-cta, .btn-cta-outline { padding: 0.8rem 1.6rem; font-size: 0.95rem; font-weight: 500; text-decoration: none; border-radius: 999px; border: 1px solid var(--primary); transition: background 0.3s, color 0.3s, border-color 0.3s; display: inline-block; }
         .btn-cta { background: var(--primary); color: var(--bg); }
         .btn-cta:hover { background: transparent; color: var(--primary); }
-        .btn-cta-outline { background: rgba(0,0,0,0.25); color: var(--primary); }
-        .btn-cta-outline:hover { background: var(--primary); color: var(--bg); }
+        .btn-cta-outline { background: transparent; color: var(--text); border-color: rgba(245, 245, 247, 0.35); }
+        .btn-cta-outline:hover { border-color: var(--text); }
 
         section { padding: 6rem 5%; max-width: 1300px; margin: 0 auto; }
         .section-header { text-align: center; margin-bottom: 3.5rem; }
-        .section-header h2 { font-family: var(--font-heading); font-size: clamp(1.9rem, 4vw, 2.6rem); color: var(--primary); margin-bottom: 1rem; }
-        .section-header .line { width: 60px; height: 2px; background: var(--primary); margin: 0 auto; display: block; opacity: 0.5; }
-        .sobre-content { text-align: center; max-width: 760px; margin: 0 auto; font-size: 1.15rem; color: var(--text-muted); font-weight: 300; }
+        .section-header h2 { font-family: var(--font-heading); font-size: clamp(2rem, 5vw, 3rem); color: var(--text); line-height: 1.1; margin-bottom: 1rem; }
+        .section-header .line { width: 48px; height: 2px; background: var(--primary); margin: 0 auto; display: block; opacity: 0.7; }
+        .sobre-content { text-align: center; max-width: 760px; margin: 0 auto; font-size: 1.2rem; color: var(--text-muted); line-height: 1.55; }
 
-        .grid-servicos { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.8rem; }
-        .card-servico { position: relative; overflow: hidden; display: flex; flex-direction: column; background: linear-gradient(145deg, rgba(255,255,255,0.055), rgba(255,255,255,0.01)); padding: 2.2rem 2rem; border-radius: 12px; border: 1px solid var(--border); transition: opacity 0.8s ease, transform 0.4s ease, border-color 0.4s, box-shadow 0.4s; }
-        .card-servico::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, var(--primary), transparent); transform: scaleX(0); transition: transform 0.5s ease; }
-        .card-servico.active:hover { transform: translateY(-6px); border-color: rgba(255,255,255,0.18); box-shadow: 0 20px 40px rgba(0,0,0,0.45); }
-        .card-servico:hover::before { transform: scaleX(1); }
-        .card-servico h3 { font-family: var(--font-heading); font-size: 1.25rem; margin-bottom: 0.4rem; }
-        .card-servico .duracao { font-size: 0.82rem; color: var(--primary); letter-spacing: 0.04em; margin-bottom: 1rem; }
+        .grid-servicos { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; }
+        .card-servico { position: relative; overflow: hidden; display: flex; flex-direction: column; background: linear-gradient(rgba(255,255,255,0.06), rgba(255,255,255,0.015)); padding: 2rem 1.9rem; border-radius: var(--raio); border: 1px solid var(--border); transition: opacity 0.8s ease, transform 0.8s ease, border-color 0.4s; }
+        .card-servico.active:hover { border-color: rgba(255,255,255,0.2); }
+        .card-servico h3 { font-family: var(--font-heading); font-size: 1.2rem; margin-bottom: 0.3rem; }
+        .card-servico .duracao { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem; }
         .card-servico .desc { color: var(--text-muted); font-size: 0.97rem; flex: 1; }
-        .card-rodape { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1.5rem; border-top: 1px solid var(--border); padding-top: 1.2rem; }
-        .card-servico .preco { font-family: var(--font-heading); font-size: 1.9rem; color: var(--primary); }
-        .card-marcar { border: 1px solid var(--primary); color: var(--primary); text-decoration: none; padding: 0.5rem 1.3rem; border-radius: 50px; font-size: 0.85rem; font-weight: 600; transition: background 0.3s, color 0.3s; }
-        .card-marcar:hover { background: var(--primary); color: var(--bg); }
+        .card-rodape { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-top: 1.5rem; }
+        .card-servico .preco { font-size: 1.9rem; font-weight: 600; letter-spacing: -0.03em; color: var(--text); }
+        .card-marcar { border: 1px solid rgba(245, 245, 247, 0.35); color: var(--text); text-decoration: none; padding: 0.45rem 1.1rem; border-radius: 999px; font-size: 0.85rem; font-weight: 500; transition: background 0.3s, color 0.3s, border-color 0.3s; }
+        .card-marcar:hover { background: var(--primary); border-color: var(--primary); color: var(--bg); }
 
         .marquee-container { background: var(--primary); color: var(--bg); padding: 1.3rem 0; overflow: hidden; white-space: nowrap; display: flex; }
         .marquee-group { display: flex; flex-shrink: 0; min-width: 100%; justify-content: space-around; gap: 2rem; padding-right: 2rem; animation: scroll-left 24s linear infinite !important; font-family: var(--font-heading); font-size: 1.4rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; }
@@ -183,13 +186,13 @@ $iconMail  = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M
         .galeria-scroll { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 1.5rem; padding-bottom: 1.5rem; scrollbar-width: thin; scrollbar-color: var(--primary) var(--surface); }
         .galeria-scroll::-webkit-scrollbar { height: 6px; }
         .galeria-scroll::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
-        .galeria-item { position: relative; flex: 0 0 min(85%, 560px); height: 420px; scroll-snap-align: center; border-radius: 12px; overflow: hidden; }
+        .galeria-item { position: relative; flex: 0 0 min(85%, 560px); height: 420px; scroll-snap-align: center; border-radius: var(--raio); overflow: hidden; }
         .galeria-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.8s ease; }
         .galeria-item:hover img { transform: scale(1.04); }
         .galeria-item figcaption { position: absolute; inset: auto 0 0 0; padding: 2.5rem 1.5rem 1.2rem; background: linear-gradient(transparent, rgba(0,0,0,0.75)); font-size: 0.95rem; }
 
         .grid-equipa { display: flex; justify-content: center; gap: 2.5rem; flex-wrap: wrap; }
-        .membro { text-align: center; width: 250px; display: flex; flex-direction: column; align-items: center; background: rgba(255,255,255,0.02); padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border); transition: border-color 0.3s; }
+        .membro { text-align: center; width: 250px; display: flex; flex-direction: column; align-items: center; background: rgba(255,255,255,0.02); padding: 1.5rem; border-radius: var(--raio); border: 1px solid var(--border); transition: border-color 0.3s; }
         .membro:hover { border-color: var(--primary); }
         .avatar-img { width: 140px; height: 140px; border-radius: 50%; object-fit: cover; border: 3px solid var(--surface-light); margin: 0 auto 1.2rem; transition: border-color 0.4s, filter 0.4s; filter: grayscale(100%); }
         .avatar-ini { display: flex; align-items: center; justify-content: center; background: var(--surface-light); font-family: var(--font-heading); font-size: 3.2rem; color: var(--primary); filter: none; }
@@ -203,13 +206,13 @@ $iconMail  = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M
         .testemunhos-scroll { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 1.5rem; padding-bottom: 2rem; scrollbar-width: thin; scrollbar-color: var(--primary) var(--surface); }
         .testemunhos-scroll::-webkit-scrollbar { height: 6px; }
         .testemunhos-scroll::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
-        .testemunho { flex: 0 0 min(85%, 350px); scroll-snap-align: center; background: var(--bg); padding: 2.5rem 2rem 2rem; border-radius: 12px; border: 1px solid var(--border); position: relative; display: flex; flex-direction: column; justify-content: space-between; }
+        .testemunho { flex: 0 0 min(85%, 350px); scroll-snap-align: center; background: var(--bg); padding: 2.5rem 2rem 2rem; border-radius: var(--raio); border: 1px solid var(--border); position: relative; display: flex; flex-direction: column; justify-content: space-between; }
         .testemunho .quote { font-size: 5rem; line-height: 1; font-family: var(--font-heading); color: var(--primary); opacity: 0.25; position: absolute; top: 12px; left: 22px; }
-        .testemunho p { position: relative; font-size: 1.05rem; font-style: italic; color: #cfcfd3; margin-bottom: 1.5rem; padding-top: 1.2rem; flex: 1; }
+        .testemunho p { position: relative; font-size: 1.05rem; font-style: italic; color: var(--text); margin-bottom: 1.5rem; padding-top: 1.2rem; flex: 1; }
         .testemunho h5 { color: var(--primary); font-weight: 500; font-size: 0.95rem; display: flex; justify-content: space-between; align-items: center; }
 
         .faq-grid { max-width: 800px; margin: 0 auto; }
-        .faq-item { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 0.9rem; transition: border-color 0.3s; }
+        .faq-item { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; margin-bottom: 0.9rem; transition: border-color 0.3s; }
         .faq-item[open] { border-color: var(--primary); }
         .faq-item summary { padding: 1.3rem 1.5rem; cursor: pointer; font-weight: 500; list-style: none; display: flex; justify-content: space-between; gap: 1rem; font-size: 1.03rem; }
         .faq-item summary::-webkit-details-marker { display: none; }
@@ -223,7 +226,7 @@ $iconMail  = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M
         .contacto-linha h3 { font-family: var(--font-heading); color: var(--primary); font-size: 1.1rem; margin-bottom: 0.2rem; }
         .contacto-linha p, .contacto-linha a { color: var(--text-muted); text-decoration: none; }
         .contacto-linha a:hover { color: var(--primary); }
-        .mapa-container { border-radius: 12px; overflow: hidden; border: 1px solid var(--border); height: 400px; }
+        .mapa-container { border-radius: var(--raio); overflow: hidden; border: 1px solid var(--border); height: 400px; }
         .mapa-container iframe { width: 100%; height: 100%; border: 0; filter: invert(90%) hue-rotate(180deg) grayscale(20%); }
 
         footer { background: #050505; border-top: 1px solid var(--border); padding: 5rem 5% 2rem; }
@@ -243,7 +246,7 @@ $iconMail  = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M
         .footer-bottom a { color: var(--text-muted); text-decoration: none; margin-left: 1.5rem; transition: color 0.3s; }
         .footer-bottom a:hover { color: var(--primary); }
 
-        .mobile-cta { display: none; position: fixed; bottom: 0; left: 0; width: 100%; background: var(--primary); color: var(--bg); text-align: center; padding: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; z-index: 1000; text-decoration: none; }
+        .mobile-cta { display: none; position: fixed; bottom: 0; left: 0; width: 100%; background: var(--primary); color: var(--bg); text-align: center; padding: 1rem; font-weight: 600; z-index: 1000; text-decoration: none; }
         .fab-whatsapp { position: fixed; bottom: 28px; right: 28px; background: #25D366; color: #fff; width: 58px; height: 58px; border-radius: 50%; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 15px rgba(37, 211, 102, 0.4); z-index: 999; transition: transform 0.3s; }
         .fab-whatsapp:hover { transform: scale(1.08); }
         .fab-whatsapp svg { width: 32px; height: 32px; fill: currentColor; }
@@ -251,7 +254,7 @@ $iconMail  = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M
         @media (max-width: 900px) {
             .nav-toggle { display: flex; }
             .nav-cta { display: none; }
-            .nav-links { display: none; position: absolute; top: 100%; left: 0; right: 0; flex-direction: column; align-items: flex-start; gap: 1.2rem; background: rgba(10,10,10,0.97); padding: 1.5rem 5% 2rem; border-bottom: 1px solid var(--border); }
+            .nav-links { display: none; position: absolute; top: 100%; left: 0; right: 0; flex-direction: column; align-items: flex-start; gap: 1.2rem; background: rgba(0,0,0,0.92); padding: 1.5rem 5% 2rem; border-bottom: 1px solid var(--border); }
             nav.open .nav-links { display: flex; }
             section { padding: 4.5rem 5%; }
             .contactos-wrapper { grid-template-columns: 1fr; gap: 2.5rem; }
@@ -290,9 +293,10 @@ $iconMail  = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M
     </nav>
 
     <header class="hero">
+        <div class="gradiente-animado" aria-hidden="true"><span></span><span></span><span></span></div>
         <span class="hero-tag">Barbearia Premium</span>
         <h1><?= e($nome) ?></h1>
-        <p><?= e($slogan) ?></p>
+        <p data-stagger><?= e($slogan) ?></p>
         <div class="hero-buttons">
             <a href="#servicos" class="btn-cta-outline">Ver serviços</a>
             <a href="<?= e($linkMarcar) ?>" class="btn-cta">Marcar agora</a>
@@ -301,13 +305,13 @@ $iconMail  = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M
 
     <?php if ($sobre): ?>
     <section id="sobre" class="reveal">
-        <div class="section-header"><h2>A Nossa História</h2><span class="line"></span></div>
+        <div class="section-header"><h2 data-stagger>A Nossa História</h2><span class="line"></span></div>
         <div class="sobre-content"><p><?= nl2br(e($sobre)) ?></p></div>
     </section>
     <?php endif; ?>
 
     <section id="servicos">
-        <div class="section-header reveal"><h2>Serviços Premium</h2><span class="line"></span></div>
+        <div class="section-header reveal"><h2 data-stagger>Serviços Premium</h2><span class="line"></span></div>
         <div class="grid-servicos">
             <?php foreach ($servicos as $i => $s): ?>
                 <article class="card-servico reveal" style="--i: <?= (int)$i % 6 ?>">
@@ -332,7 +336,7 @@ $iconMail  = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M
     </div>
 
     <section id="galeria">
-        <div class="section-header reveal"><h2>O Nosso Trabalho</h2><span class="line"></span></div>
+        <div class="section-header reveal"><h2 data-stagger>O Nosso Trabalho</h2><span class="line"></span></div>
         <div class="galeria-wrapper reveal">
             <div class="galeria-scroll">
                 <?php foreach ($galeriaFinal as $img): ?>
@@ -348,7 +352,7 @@ $iconMail  = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M
     <!-- SECÇÃO DA EQUIPA ATUALIZADA -->
     <?php if (count($equipa) > 0): ?>
     <section id="equipa" class="reveal">
-        <div class="section-header"><h2>Mestres Barbeiros</h2><span class="line"></span></div>
+        <div class="section-header"><h2 data-stagger>Mestres Barbeiros</h2><span class="line"></span></div>
         <div class="grid-equipa">
             <?php foreach ($equipa as $b): ?>
                 <div class="membro">
@@ -389,7 +393,7 @@ $iconMail  = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M
     <!-- REVIEWS DINÂMICAS EM SLIDER -->
     <div class="bg-surface">
         <section class="reveal" style="max-width: 100%; padding-left: 0; padding-right: 0;">
-            <div class="section-header"><h2>O Que Dizem</h2><span class="line"></span></div>
+            <div class="section-header"><h2 data-stagger>O Que Dizem</h2><span class="line"></span></div>
             <div class="galeria-wrapper reveal">
                 <div class="testemunhos-scroll">
                     <?php if (!empty($googleReviews)): ?>
@@ -418,7 +422,7 @@ $iconMail  = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M
     </div>
 
     <section id="faq" class="reveal">
-        <div class="section-header"><h2>Perguntas Frequentes</h2><span class="line"></span></div>
+        <div class="section-header"><h2 data-stagger>Perguntas Frequentes</h2><span class="line"></span></div>
         <div class="faq-grid">
             <?php foreach ($faqFinal as $f): ?>
                 <details class="faq-item"><summary><?= e($f['pergunta']) ?></summary><p><?= e($f['resposta']) ?></p></details>
@@ -427,7 +431,7 @@ $iconMail  = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M
     </section>
 
     <section id="contactos" class="reveal">
-        <div class="section-header"><h2>Visite-nos</h2><span class="line"></span></div>
+        <div class="section-header"><h2 data-stagger>Visite-nos</h2><span class="line"></span></div>
         <div class="contactos-wrapper">
             <div class="contacto-info">
                 <a href="<?= e($linkMarcar) ?>" class="btn-cta" style="margin-bottom:2rem">Marcar online</a>
@@ -484,6 +488,7 @@ $iconMail  = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M
     </a>
     <?php endif; ?>
 
+    <script src="assets/js/efeitos.js" defer></script>
     <script>
         const navbar = document.getElementById('navbar');
         const toggle = document.getElementById('nav-toggle');

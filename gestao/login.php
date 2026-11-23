@@ -105,31 +105,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login — BarberFlow</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Outfit', sans-serif; background: #0a0a0a; color: #f8f9fa; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 1rem; background-image: linear-gradient(rgba(10, 10, 10, 0.85), rgba(10, 10, 10, 0.95)), url('https://images.unsplash.com/photo-1585747860715-2ba37e788b70?ixlib=rb-4.0.3&auto=format&fit=crop&w=1920&q=80'); background-size: cover; background-position: center; }
-        .login-box { background: #121212; padding: 3rem; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08); width: 100%; max-width: 400px; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
-        .login-box h1 { font-family: 'Cinzel', serif; color: #cda47c; text-align: center; margin-bottom: 2rem; font-size: 1.8rem; }
-        .login-box p.ajuda { color: #9ca3af; font-size: 0.9rem; margin-bottom: 1.5rem; text-align: center; }
-        .input-group { margin-bottom: 1.5rem; }
-        .input-group label { display: block; font-size: 0.9rem; color: #9ca3af; margin-bottom: 0.5rem; }
-        .input-group input { width: 100%; padding: 0.8rem 1rem; background: #1a1a1a; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px; color: #fff; font-family: 'Outfit', sans-serif; outline: none; transition: 0.3s; }
-        .input-group input:focus { border-color: #cda47c; }
-        .input-codigo { letter-spacing: 0.4em; text-align: center; font-size: 1.4rem; }
-        .lembrar { display: flex; align-items: center; gap: 0.5rem; color: #9ca3af; font-size: 0.9rem; margin: -0.5rem 0 1.5rem; }
-        .btn-submit { width: 100%; padding: 1rem; background: #cda47c; color: #0a0a0a; border: none; border-radius: 6px; font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer; transition: 0.3s; }
-        .btn-submit:hover { background: #e0be9a; }
-        .error-msg, .ok-msg { padding: 1rem; border-radius: 6px; margin-bottom: 1.5rem; font-size: 0.9rem; text-align: center; }
-        .error-msg { background: rgba(248, 113, 113, 0.1); color: #f87171; border: 1px solid rgba(248, 113, 113, 0.2); }
-        .ok-msg { background: rgba(74, 222, 128, 0.1); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.2); }
-        .back-link { display: block; text-align: center; margin-top: 1.2rem; color: #9ca3af; text-decoration: none; font-size: 0.9rem; transition: 0.3s; }
-        .back-link:hover { color: #cda47c; }
-    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../assets/css/efeitos.css">
+    <link rel="stylesheet" href="../assets/css/entrada-gestao.css">
 </head>
 <body>
+    <div class="gradiente-animado" aria-hidden="true"><span></span><span></span><span></span></div>
     <div class="login-box">
-        <h1>Área Restrita</h1>
+        <h1 data-stagger>Área Restrita</h1>
 
         <?php if ($aviso): ?><div class="ok-msg"><?= htmlspecialchars($aviso) ?></div><?php endif; ?>
         <?php if ($erro): ?><div class="error-msg"><?= htmlspecialchars($erro) ?></div><?php endif; ?>
@@ -166,5 +149,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <a href="../index.php?slug=rlbarber" class="back-link">← Voltar ao site</a>
         <?php endif; ?>
     </div>
+    <script src="../assets/js/efeitos.js" defer></script>
 </body>
 </html>
