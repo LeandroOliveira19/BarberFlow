@@ -33,7 +33,18 @@ final class Sessao {
         ]);
         if ($dados !== null) {
             curl_setopt($ch, CURLOPT_POST, true);
-            curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($dados));
+            // Com ficheiros (CURLFile) o pedido vai em multipart; as listas (ex.: dias[]) passam a chaves planas "dias[0]"
+            $temFicheiro = (bool)array_filter($dados, fn($v) => $v instanceof CURLFile);
+            if ($temFicheiro) {
+                $plano = [];
+                foreach ($dados as $k => $v) {
+                    if (is_array($v)) { foreach (array_values($v) as $i => $item) $plano[$k . '[' . $i . ']'] = (string)$item; }
+                    else $plano[$k] = $v;
+                }
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $plano);
+            } else {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($dados));
+            }
         }
         $resp = (string)curl_exec($ch);
         $status = (int)curl_getinfo($ch, CURLINFO_RESPONSE_CODE);

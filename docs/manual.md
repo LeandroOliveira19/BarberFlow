@@ -77,14 +77,24 @@ Este manual explica como se usa o BarberFlow em cada perfil. Para instalar, ver 
 - **Fornecedores:** contactos e NIF.
 
 ### Definições
-- **Informação pública:** nome, morada, slogan, "Sobre nós", horário.
-- **Cancelar/remarcar na app até:** quantas horas antes o cliente ainda pode alterar sozinho (0 a 168).
-- **Aparência:** tema do site, cores, fonte, imagem principal, galeria e redes sociais.
-  - No tema **Clássico (Escuro)**, o topo do site tem um fumo animado na **cor principal** escolhida e o slogan e os títulos aparecem palavra a palavra. O tema **Minimalista** não tem estes efeitos.
+- **Barbearia:** nome, morada, **telefone** e **email de contacto**. Aparecem no site, na app e nos emails.
+- **Horário e marcações:**
+  - os **dias abertos** ligam-se e desligam-se com interruptores (tem de ficar pelo menos um);
+  - as horas de abertura e de fecho (o fecho tem de ser depois da abertura);
+  - o **intervalo entre marcações** (15, 20, 30, 45 ou 60 min);
+  - **Cancelar/remarcar na app até:** quantas horas antes o cliente ainda pode alterar sozinho (0 a 168).
+- **Site público:** slogan, "Sobre nós", imagem principal, 3 imagens da galeria, Instagram e Facebook. Também mostra se as avaliações do Google estão ligadas.
+  - **Imagens:** cada uma pode vir **do teu dispositivo** ("Escolher ficheiro": JPG, PNG ou WEBP, até 2 MB) **ou de uma ligação** `https://`. Tem pré-visualização e a opção "Remover esta imagem".
+  - Ao trocar ou remover uma fotografia enviada, o ficheiro antigo é apagado do servidor.
+- Se algum valor não for válido, nada é gravado e aparece um aviso no topo a dizer o que corrigir.
+- **A aparência do site** (layout Clássico ou Minimalista, fonte dos títulos e cores) **não se muda nas Definições**: é configurada pelo administrador do BarberFlow, a pedido da barbearia.
+  - No tema **Clássico (Escuro)**, o topo do site tem um fumo animado na **cor principal** e o slogan e os títulos aparecem palavra a palavra. O tema **Minimalista** não tem estes efeitos.
   - Quem tiver a opção **"reduzir movimento"** ligada no sistema vê tudo parado. O mesmo acontece no ecrã de entrada da gestão.
 
 ### Perfil (gestor e barbeiro)
-- **Dados pessoais:** e a fotografia (JPG, PNG ou WEBP, até 2 MB).
+- **Os meus dados:** nome, telefone e a fotografia (JPG, PNG ou WEBP, até 2 MB, ou uma ligação `https://`).
+- **Perfil público (só barbeiros):** especialidades, Instagram e "Sobre mim". Aparecem na secção Equipa do site. O gestor não tem esta parte, porque não aparece no site.
+- **Avisos:** as mensagens ("Perfil atualizado", erros…) aparecem numa pílula no topo e desaparecem sozinhas ao fim de 4 segundos. Com "reduzir movimento" ligado, ficam até carregares no ×.
 - **Mudar a senha:**
   1. "Enviar código" manda-te um código por email.
   2. Escreve o código e a senha nova (pelo menos 8 caracteres, com letras e números).

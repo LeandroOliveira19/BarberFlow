@@ -923,11 +923,163 @@ function teste_gestao_v2(): void {
     ok(str_contains($r['html'], 'class="menu-grupo"') && !str_contains($r['html'], '>Negócio<') && !str_contains($r['html'], 'Fornecedores') && semErrosPhp($r['html']), 'barbeiro: menu só com os seus grupos', $r);
 }
 
+/* ===================== Definições, Perfil, avisos e escape ===================== */
+function teste_definicoes_perfil(): void {
+    global $BASE, $pdo;
+    $ficheiro = __DIR__ . '/../../../config/formularios.php';
+    ok(is_file($ficheiro), 'config/formularios.php existe');
+    if (is_file($ficheiro)) {
+        require_once $ficheiro;
+        $base = ['nome' => 'RL', 'morada' => 'Aveiro', 'telemovel_contacto' => '+351 912 345 678', 'email_contacto' => 'geral@rl.pt',
+                 'dias' => ['3', '1', '2'], 'hora_abertura' => '09:00', 'hora_fecho' => '20:00', 'intervalo_marcacoes' => '30',
+                 'antecedencia_alteracao_horas' => '24', 'slogan' => 'Barba & "Top"', 'sobre' => '', 'tema_layout' => 'classico',
+                 'tema_fonte' => 'Cinzel', 'tema_cor' => '#CDA47C', 'tema_fundo' => '#0a0a0a', 'tema_hero' => '', 'link_instagram' => 'https://instagram.com/rl',
+                 'link_facebook' => '', 'galeria_img_1' => '', 'galeria_img_2' => '', 'galeria_img_3' => ''];
+        $v = validarDefinicoes($base);
+        ok($v['erro'] === null && $v['configs']['dias_funcionamento'] === '1,2,3' && $v['configs']['telemovel_contacto'] === '+351912345678'
+            && $v['configs']['tema_cor'] === '#cda47c' && $v['configs']['slogan'] === 'Barba & "Top"', 'validarDefinicoes: aceita e normaliza', null);
+        $maus = [
+            'tema_cor' => 'red', 'hora_fecho' => '08:00', 'dias' => [], 'email_contacto' => 'x@', 'intervalo_marcacoes' => '17',
+            'link_facebook' => 'javascript:alert(1)', 'antecedencia_alteracao_horas' => '200', 'nome' => '', 'telemovel_contacto' => '12ab',
+            'tema_layout' => 'outro', 'tema_fonte' => 'Comic Sans',
+        ];
+        foreach ($maus as $campo => $valor) {
+            $r = validarDefinicoes(array_merge($base, [$campo => $valor]));
+            ok(is_string($r['erro']) && $r['erro'] !== '', "validarDefinicoes: recusa $campo inválido");
+        }
+        ok(validarDefinicoes(array_merge($base, ['dias' => ['9']]))['erro'] !== null, 'validarDefinicoes: recusa dia fora de 1–7');
+
+        $p = validarPerfil(['nome' => 'Rui', 'telefone' => '912 345 678', 'foto_url' => 'uploads/barbeiros/a.png', 'especialidades' => 'Barba', 'bio' => '', 'instagram' => ''], true);
+        ok($p['erro'] === null && $p['dados']['telefone'] === '912345678' && $p['dados']['especialidades'] === 'Barba', 'validarPerfil: barbeiro válido');
+        $g = validarPerfil(['nome' => 'Ana', 'telefone' => '', 'foto_url' => '', 'especialidades' => 'X', 'bio' => 'Y', 'instagram' => 'https://i.com/a'], false);
+        ok($g['erro'] === null && !array_key_exists('especialidades', $g['dados']) && !array_key_exists('bio', $g['dados']), 'validarPerfil: gestor sem campos públicos');
+        foreach ([['nome' => 'A'], ['telefone' => 'abc'], ['foto_url' => 'javascript:x'], ['instagram' => 'ftp://x']] as $mau) {
+            $r = validarPerfil(array_merge(['nome' => 'Rui', 'telefone' => '', 'foto_url' => '', 'especialidades' => '', 'bio' => '', 'instagram' => ''], $mau), true);
+            ok($r['erro'] !== null, 'validarPerfil: recusa ' . key($mau) . ' inválido');
+        }
+    }
+
+    // Guardar o estado da barbearia 1 para repor no fim (configurações e nome/morada)
+    $cfgOrig = $pdo->query("SELECT chave, valor FROM configuracoes WHERE barbearia_id = 1")->fetchAll(PDO::FETCH_KEY_PAIR);
+    $barbOrig = $pdo->query("SELECT nome, morada FROM barbearias WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+    $GLOBALS['LIMPEZA'][] = "DELETE FROM configuracoes WHERE barbearia_id = 1";
+    foreach ($cfgOrig as $chave => $valor) {
+        $GLOBALS['LIMPEZA'][] = "INSERT INTO configuracoes (barbearia_id, chave, valor) VALUES (1, " . $pdo->quote($chave) . ", " . $pdo->quote($valor) . ")";
+    }
+    $GLOBALS['LIMPEZA'][] = "UPDATE barbearias SET nome = " . $pdo->quote($barbOrig['nome']) . ", morada = " . $pdo->quote($barbOrig['morada']) . " WHERE id = 1";
+
+    // Escape: o texto aparece uma só vez escapado e o HTML nunca é interpretado
+    $s = new Sessao($BASE);
+    $pdo->exec("UPDATE configuracoes SET valor = 'Barba & Cabelo \"Top\"' WHERE barbearia_id = 1 AND chave = 'slogan'");
+    $r = $s->get('index.php?slug=rlbarber');
+    ok(str_contains($r['html'], 'Barba &amp; Cabelo &quot;Top&quot;') && !str_contains($r['html'], '&amp;amp;'), 'site: slogan escapado uma só vez', $r);
+    $pdo->exec("UPDATE configuracoes SET valor = '<script>alert(1)</script>' WHERE barbearia_id = 1 AND chave = 'slogan'");
+    $r = $s->get('index.php?slug=rlbarber');
+    ok(!str_contains($r['html'], '<script>alert(1)'), 'site: HTML no slogan não é interpretado', $r);
+
+    // Definições: campos novos, interruptores, validação no servidor e aviso
+    $g = new Sessao($BASE); $g->login(TESTE_GESTOR);
+    $r = $g->get('gestao/index.php?m=definicoes&a=editar');
+    $h = $r['html'];
+    ok(str_contains($h, 'name="telemovel_contacto"') && str_contains($h, 'name="email_contacto"') && str_contains($h, 'name="dias[]"')
+        && str_contains($h, 'class="interruptor"') && str_contains($h, 'name="intervalo_marcacoes"') && semErrosPhp($h), 'definições: campos completos com interruptores', $r);
+    $csrf = Sessao::csrf($h);
+    $post = array_merge($base ?? [], ['csrf' => $csrf, 'nome' => (string)$barbOrig['nome'], 'morada' => (string)$barbOrig['morada'], 'slogan' => 'Teste', 'dias' => ['1', '2', '3', '4', '5']]);
+    $corAntes = $pdo->query("SELECT valor FROM configuracoes WHERE barbearia_id = 1 AND chave = 'tema_cor'")->fetchColumn();
+    $g->post('gestao/index.php?m=definicoes&a=guardar', array_merge($post, ['tema_cor' => 'red']));
+    $corDepois = $pdo->query("SELECT valor FROM configuracoes WHERE barbearia_id = 1 AND chave = 'tema_cor'")->fetchColumn();
+    $r = $g->get('gestao/index.php?m=definicoes&a=editar');
+    ok($corAntes === $corDepois, 'definições: a cor enviada à mão é ignorada (a aparência é só do administrador)', $r);
+    $emailAntes = $pdo->query("SELECT valor FROM configuracoes WHERE barbearia_id = 1 AND chave = 'email_contacto'")->fetchColumn();
+    $g->post('gestao/index.php?m=definicoes&a=guardar', array_merge($post, ['email_contacto' => 'nao-e-email']));
+    $r = $g->get('gestao/index.php?m=definicoes&a=editar');
+    ok($emailAntes === $pdo->query("SELECT valor FROM configuracoes WHERE barbearia_id = 1 AND chave = 'email_contacto'")->fetchColumn()
+        && str_contains($r['html'], 'class="toasts"') && str_contains($r['html'], 'role="status"') && str_contains($r['html'], 'O email de contacto não é válido'),
+        'definições: email inválido recusado, com aviso', $r);
+    $g->post('gestao/index.php?m=definicoes&a=guardar', $post);
+    $dias = $pdo->query("SELECT valor FROM configuracoes WHERE barbearia_id = 1 AND chave = 'dias_funcionamento'")->fetchColumn();
+    $intv = $pdo->query("SELECT valor FROM configuracoes WHERE barbearia_id = 1 AND chave = 'intervalo_marcacoes'")->fetchColumn();
+    ok($dias === '1,2,3,4,5' && $intv === '30', 'definições: dias e intervalo guardados');
+
+    // Perfil: o gestor não tem campos públicos; o barbeiro tem; telefone guardado
+    $r = $g->get('gestao/index.php?m=perfil&a=editar');
+    ok(str_contains($r['html'], 'name="telefone"') && !str_contains($r['html'], 'name="especialidades"') && str_contains($r['html'], 'class="interruptor"') && semErrosPhp($r['html']), 'perfil do gestor: sem campos públicos, com telefone', $r);
+    $g->post('gestao/index.php?m=perfil&a=guardar', ['csrf' => Sessao::csrf($r['html']), 'nome' => 'Gestor Teste', 'telefone' => '912 000 111', 'foto_url' => '']);
+    $tel = $pdo->query("SELECT telefone FROM utilizadores WHERE email = '" . TESTE_GESTOR . "'")->fetchColumn();
+    ok($tel === '912000111', 'perfil: telefone guardado sem espaços');
+    $b = new Sessao($BASE); $b->login(TESTE_BARBEIRO);
+    $r = $b->get('gestao/index.php?m=perfil&a=editar');
+    ok(str_contains($r['html'], 'name="especialidades"') && str_contains($r['html'], 'Equipa'), 'perfil do barbeiro: perfil público do site', $r);
+}
+
+/* ===================== Imagens do site (dispositivo ou ligação) e aparência fora das Definições ===================== */
+function teste_imagens_site(): void {
+    global $BASE, $pdo;
+    require_once __DIR__ . '/../../../config/formularios.php';
+    $base = ['nome' => 'RL', 'morada' => 'Aveiro', 'telemovel_contacto' => '', 'email_contacto' => '', 'dias' => ['1'], 'hora_abertura' => '09:00',
+             'hora_fecho' => '20:00', 'intervalo_marcacoes' => '15', 'antecedencia_alteracao_horas' => '24', 'slogan' => '', 'sobre' => '',
+             'tema_layout' => 'classico', 'tema_fonte' => 'Cinzel', 'tema_cor' => '#cda47c', 'tema_fundo' => '#0a0a0a', 'tema_hero' => '',
+             'link_instagram' => '', 'link_facebook' => '', 'galeria_img_1' => '', 'galeria_img_2' => '', 'galeria_img_3' => ''];
+    ok(validarDefinicoes(array_merge($base, ['tema_hero' => 'uploads/barbearias/1/hero_1.jpg']), 1)['erro'] === null, 'validarDefinicoes: aceita imagem enviada da própria barbearia');
+    ok(validarDefinicoes(array_merge($base, ['tema_hero' => 'uploads/barbearias/2/hero_1.jpg']), 1)['erro'] !== null, 'validarDefinicoes: recusa imagem de outra barbearia');
+    ok(validarDefinicoes(array_merge($base, ['galeria_img_1' => 'uploads/barbearias/1/../../config/db.php']), 1)['erro'] !== null, 'validarDefinicoes: recusa caminho com ..');
+    ok(validarDefinicoes(array_merge($base, ['link_instagram' => 'uploads/barbearias/1/a.jpg']), 1)['erro'] !== null, 'validarDefinicoes: Instagram só aceita ligação');
+
+    // Guardar o estado da barbearia 1 para repor no fim. Vai para o INÍCIO da limpeza: um teste anterior já pode ter
+    // mexido nas configurações, e a reposição dele (com o estado verdadeiro) tem de ser a última a correr.
+    $cfgOrig = $pdo->query("SELECT chave, valor FROM configuracoes WHERE barbearia_id = 1")->fetchAll(PDO::FETCH_KEY_PAIR);
+    $restauro = ["DELETE FROM configuracoes WHERE barbearia_id = 1"];
+    foreach ($cfgOrig as $chave => $valor) {
+        $restauro[] = "INSERT INTO configuracoes (barbearia_id, chave, valor) VALUES (1, " . $pdo->quote($chave) . ", " . $pdo->quote($valor) . ")";
+    }
+    array_splice($GLOBALS['LIMPEZA'], 0, 0, $restauro);
+    $barbOrig = $pdo->query("SELECT nome, morada FROM barbearias WHERE id = 1")->fetch(PDO::FETCH_ASSOC);
+    $valorCfg = fn(string $k) => $pdo->query("SELECT valor FROM configuracoes WHERE barbearia_id = 1 AND chave = " . $pdo->quote($k))->fetchColumn();
+
+    $g = new Sessao($BASE); $g->login(TESTE_GESTOR);
+    $r = $g->get('gestao/index.php?m=definicoes&a=editar');
+    $h = $r['html'];
+    ok(!str_contains($h, 'name="tema_cor"') && !str_contains($h, 'name="tema_layout"') && !str_contains($h, 'name="tema_fonte"') && !str_contains($h, 'name="tema_fundo"'),
+       'definições: sem a aparência do site', $r);
+    ok(str_contains($h, 'enctype="multipart/form-data"') && str_contains($h, 'name="galeria_img_2_ficheiro"') && str_contains($h, 'name="tema_hero_ficheiro"'),
+       'definições: imagens por ficheiro ou ligação', $r);
+
+    $form = ['csrf' => Sessao::csrf($h), 'nome' => (string)$barbOrig['nome'], 'morada' => (string)$barbOrig['morada'], 'dias_enviados' => '1', 'dias' => ['1', '2', '3'],
+             'hora_abertura' => '09:00', 'hora_fecho' => '20:00', 'intervalo_marcacoes' => '15', 'antecedencia_alteracao_horas' => '24',
+             'telemovel_contacto' => '', 'email_contacto' => ''];
+    $layoutAntes = $valorCfg('tema_layout');
+    $g->post('gestao/index.php?m=definicoes&a=guardar', $form + ['tema_layout' => $layoutAntes === 'classico' ? 'minimalista' : 'classico', 'tema_fonte' => 'Montserrat']);
+    ok($valorCfg('tema_layout') === $layoutAntes && $valorCfg('tema_fonte') === ($cfgOrig['tema_fonte'] ?? false), 'definições: layout e fonte enviados à mão são ignorados');
+
+    // Envio de uma imagem PNG verdadeira (1x1) para a galeria 2
+    $png = tempnam(sys_get_temp_dir(), 'bf') . '.png';
+    file_put_contents($png, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=='));
+    $g->post('gestao/index.php?m=definicoes&a=guardar', $form + ['galeria_img_2' => '', 'galeria_img_2_ficheiro' => new CURLFile($png, 'image/png', 'foto.png')]);
+    $caminho = (string)$valorCfg('galeria_img_2');
+    $ficheiro = __DIR__ . '/../../../' . $caminho;
+    ok(str_starts_with($caminho, 'uploads/barbearias/1/') && is_file($ficheiro), 'galeria: fotografia do dispositivo guardada na pasta da barbearia');
+    $r = (new Sessao($BASE))->get('index.php?slug=rlbarber');
+    ok($caminho !== '' && str_contains($r['html'], $caminho), 'site: mostra a fotografia enviada', $r);
+
+    // Um ficheiro de texto com extensão .jpg é recusado
+    $falso = tempnam(sys_get_temp_dir(), 'bf') . '.jpg';
+    file_put_contents($falso, '<?php echo "ola"; ?>');
+    $g->post('gestao/index.php?m=definicoes&a=guardar', $form + ['tema_hero_ficheiro' => new CURLFile($falso, 'image/jpeg', 'x.jpg')]);
+    $r = $g->get('gestao/index.php?m=definicoes&a=editar');
+    ok($valorCfg('tema_hero') === ($cfgOrig['tema_hero'] ?? false) && str_contains($r['html'], 'JPG, PNG ou WEBP'), 'imagem principal: ficheiro que não é imagem é recusado', $r);
+
+    // Remover a imagem apaga também o ficheiro
+    $g->post('gestao/index.php?m=definicoes&a=guardar', $form + ['remover' => ['galeria_img_2']]);
+    ok($valorCfg('galeria_img_2') === '' && !is_file($ficheiro), 'galeria: remover limpa a imagem e apaga o ficheiro');
+    @unlink($png); @unlink($falso);
+    if (is_file($ficheiro)) @unlink($ficheiro);
+}
+
 /* ===================== Execução ===================== */
 try {
     criarUtilizadoresTeste($pdo);
     foreach (['teste_modular_helpers', 'teste_gestao_base', 'teste_agenda_perfil', 'teste_modulos_gestor',
-              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda', 'teste_login_seguro', 'teste_2fa_perfil', 'teste_senha_com_codigo', 'teste_convite_barbeiro', 'teste_revisao_seguranca', 'teste_auditoria_privilegios', 'teste_cookie_sessao', 'teste_visual', 'teste_gestao_v2'] as $t) {
+              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda', 'teste_login_seguro', 'teste_2fa_perfil', 'teste_senha_com_codigo', 'teste_convite_barbeiro', 'teste_revisao_seguranca', 'teste_auditoria_privilegios', 'teste_cookie_sessao', 'teste_visual', 'teste_gestao_v2', 'teste_definicoes_perfil', 'teste_imagens_site'] as $t) {
         if (function_exists($t)) { echo "--- $t\n"; $t(); }
     }
 } finally {

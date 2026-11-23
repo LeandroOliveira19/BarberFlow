@@ -1,53 +1,60 @@
 <?php
 declare(strict_types=1);
-// Módulo: perfil / guardar (POST) — dados pessoais e foto. O CSRF já foi validado pelo index.php.
+// Módulo: perfil / guardar (POST) — dados pessoais, foto e (só barbeiros) perfil público. O CSRF já foi validado pelo index.php.
+// As regras de cada campo estão em config/formularios.php (validarPerfil).
 if (count(get_included_files()) === 1) { header('Location: ../../index.php'); exit; }
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') redirecionar(urlModulo('perfil', 'editar'));
-// Enquanto houver password por alterar, os dados não se podem guardar (igual à página antiga)
+// Enquanto houver password por alterar, os dados não se podem guardar
 if (($_SESSION['precisa_alterar_password'] ?? 0) == 1) redirecionar(urlModulo('perfil', 'editar', ['force' => 1]));
 
-$uid  = (int)$_SESSION['utilizador_id'];
-$msg  = '';
-$erro = '';
+require_once __DIR__ . '/../../../config/formularios.php';
+require_once __DIR__ . '/../../../config/uploads.php';
 
-        $nome = trim($_POST['nome'] ?? '');
-        $foto_url = trim($_POST['foto_url'] ?? '');
-        $bio = trim($_POST['bio'] ?? '');
-        $especialidades = trim($_POST['especialidades'] ?? '');
-        $instagram = trim($_POST['instagram'] ?? '');
-        
-        // Garantir que a pasta de uploads existe
-        $uploadDir = __DIR__ . '/../../../uploads/barbeiros/';
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-        }
+$uid = (int)$_SESSION['utilizador_id'];
+$stmt = $pdo->prepare("SELECT tipo, foto_url, telefone, especialidades, bio, instagram FROM utilizadores WHERE id = ? AND barbearia_id = ?");
+$stmt->execute([$uid, $bid]);
+$atual = $stmt->fetch();
+if (!$atual) redirecionar('logout.php');
+$eBarbeiro = $atual['tipo'] === 'barbeiro';
 
-        if (isset($_FILES['foto_upload']) && $_FILES['foto_upload']['error'] === UPLOAD_ERR_OK) {
-            $file = $_FILES['foto_upload'];
-            if ($file['size'] > 2 * 1024 * 1024) {
-                $erro = "O ficheiro é demasiado grande. Máximo 2MB.";
-            } else {
-                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-                if (in_array($ext, ['jpg', 'jpeg', 'png', 'webp'])) {
-                    $novoNome = 'user_' . $uid . '_' . time() . '.' . $ext;
-                    $destino = $uploadDir . $novoNome;
-                    if (move_uploaded_file($file['tmp_name'], $destino)) {
-                        $foto_url = 'uploads/barbeiros/' . $novoNome;
-                    } else {
-                        $erro = "Erro ao mover o ficheiro.";
-                    }
-                }
-            }
-        }
+// Envio parcial: o que não vier no pedido mantém o valor atual
+$dadosPost = $_POST + array_map(fn($v) => (string)($v ?? ''), [
+    'telefone' => $atual['telefone'], 'especialidades' => $atual['especialidades'],
+    'bio' => $atual['bio'], 'instagram' => $atual['instagram'], 'foto_url' => $atual['foto_url'],
+]);
 
-        if (!$erro && $nome) {
-            $stmt = $pdo->prepare("UPDATE utilizadores SET nome = ?, foto_url = ?, bio = ?, especialidades = ?, instagram = ? WHERE id = ?");
-            $stmt->execute([$nome, $foto_url ?: null, $bio, $especialidades, $instagram, $uid]);
-            $_SESSION['utilizador_nome'] = $nome;
-            $msg = 'Perfil atualizado com sucesso!';
-        }
+// Foto: um ficheiro enviado tem prioridade; depois a ligação escrita; senão mantém o ficheiro que já lá estava
+$fotoGuardada = (string)($atual['foto_url'] ?? '');
+if (trim((string)($dadosPost['foto_url'] ?? '')) === '' && $fotoGuardada !== '' && !preg_match('#^https?://#i', $fotoGuardada)) {
+    $dadosPost['foto_url'] = $fotoGuardada;
+}
 
-if ($erro) flash('erro', $erro);
-elseif ($msg) flash('sucesso', $msg);
+$envio = $_FILES['foto_upload'] ?? null;
+if (imagemFoiEnviada($envio)) {
+    $r = guardarImagemEnviada($envio, dirname(__DIR__, 3) . '/uploads/barbeiros/', 'user_' . $uid);
+    if ($r['erro'] !== null) {
+        flash('erro', $r['erro']);
+        redirecionar(urlModulo('perfil', 'editar'));
+    }
+    $dadosPost['foto_url'] = 'uploads/barbeiros/' . $r['nome'];
+}
+
+$valido = validarPerfil($dadosPost, $eBarbeiro);
+if ($valido['erro'] !== null) {
+    flash('erro', $valido['erro']);
+    redirecionar(urlModulo('perfil', 'editar'));
+}
+
+$d = $valido['dados'];
+if ($eBarbeiro) {
+    $stmt = $pdo->prepare("UPDATE utilizadores SET nome = ?, telefone = ?, foto_url = ?, especialidades = ?, bio = ?, instagram = ? WHERE id = ? AND barbearia_id = ?");
+    $stmt->execute([$d['nome'], $d['telefone'], $d['foto_url'], $d['especialidades'], $d['bio'], $d['instagram'], $uid, $bid]);
+} else {
+    $stmt = $pdo->prepare("UPDATE utilizadores SET nome = ?, telefone = ?, foto_url = ? WHERE id = ? AND barbearia_id = ?");
+    $stmt->execute([$d['nome'], $d['telefone'], $d['foto_url'], $uid, $bid]);
+}
+$_SESSION['utilizador_nome'] = $d['nome'];
+
+flash('sucesso', 'Perfil atualizado com sucesso.');
 redirecionar(urlModulo('perfil', 'editar'));

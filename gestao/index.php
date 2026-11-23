@@ -100,11 +100,26 @@ require __DIR__ . '/layout/menu.php';   // define $tituloPagina e $barbeariaMenu
         <?php endif; ?>
     </header>
 <?php if ($mensagens): ?>
-    <div class="flashes">
+    <!-- Avisos tipo iOS: descem do topo e desaparecem aos 4 s (com "reduzir movimento" ficam até se fecharem) -->
+    <div class="toasts" role="status" aria-live="polite">
         <?php foreach ($mensagens as $f): ?>
-            <div class="flash flash-<?= e($f['tipo']) ?>"><?= e($f['texto']) ?></div>
+            <div class="toast toast-<?= e($f['tipo']) ?>">
+                <svg class="toast-ico" viewBox="0 0 24 24" aria-hidden="true"><?= $f['tipo'] === 'sucesso' ? '<path d="M5 12l5 5L20 7"/>' : '<path d="M12 8v5M12 16.5v.5"/><circle cx="12" cy="12" r="9"/>' ?></svg>
+                <span><?= e($f['texto']) ?></span>
+                <button type="button" class="toast-fechar" aria-label="Fechar aviso">×</button>
+            </div>
         <?php endforeach; ?>
     </div>
+    <script>
+        (function () {
+            var avisos = document.querySelectorAll('.toast');
+            function fechar(el) { el.classList.add('a-sair'); setTimeout(function () { el.remove(); }, 300); }
+            avisos.forEach(function (el) { el.querySelector('.toast-fechar').addEventListener('click', function () { fechar(el); }); });
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                avisos.forEach(function (el, i) { setTimeout(function () { fechar(el); }, 4000 + i * 600); });
+            }
+        })();
+    </script>
 <?php endif;
 echo $conteudo;
 echo "</div>\n";

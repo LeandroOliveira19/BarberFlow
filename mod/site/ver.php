@@ -20,9 +20,9 @@ $stmt = $pdo->prepare("SELECT chave, valor FROM configuracoes WHERE barbearia_id
 $stmt->execute([$id_barbearia]);
 $config = $stmt->fetchAll(PDO::FETCH_KEY_PAIR); 
 
-// Helper com TIPAGEM (corrige o aviso do VS Code)
-function getConfig(array $config, string $chave, string $default = ''): string { 
-    return htmlspecialchars((string)($config[$chave] ?? $default)); 
+// Valor de uma configuração tal como está guardado. Quem o mostra escapa-o (e() no HTML, cssUrl() no CSS).
+function getConfig(array $config, string $chave, string $default = ''): string {
+    return (string)($config[$chave] ?? $default);
 }
 
 $telemovel = preg_replace('/[^0-9]/', '', getConfig($config, 'telemovel_contacto', '351900000000'));
