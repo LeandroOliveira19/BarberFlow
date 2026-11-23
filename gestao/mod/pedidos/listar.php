@@ -53,12 +53,7 @@ foreach ($pedidos as $p) {
 ?>
 
 <style>
-    .filter-bar { padding: 1rem; background: var(--superficie); border: 1px solid var(--border); border-radius: var(--raio); margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
-    .filter-bar select { padding: 0.6rem 1rem; background: var(--fundo); border: 1px solid var(--border); border-radius: var(--raio-campo); color: #fff; }
-    .filter-bar button { padding: 0.6rem 1.5rem; background: var(--gold); color: #000; border: none; border-radius: var(--raio-campo); font-weight: 600; cursor: pointer; transition: 0.3s; }
-    .filter-bar button:hover { background: #e0be9a; }
-    .btn-limpar { color: var(--muted); text-decoration: none; font-size: 0.85rem; }
-    .btn-limpar:hover { color: #fff; }
+    .filtro-pedidos { margin-bottom: 1.6rem; }
 
     .badge.aprovado  { color: #4ade80; background: rgba(34, 197, 94, 0.15); }
     .badge.entregue  { color: #60a5fa; background: rgba(96, 165, 250, 0.15); }
@@ -93,25 +88,19 @@ foreach ($pedidos as $p) {
                 Aprova ou rejeita os pedidos de reposição enviados pelos barbeiros.
             </p>
         </div>
-        <a href="logout.php" class="btn-logout">Terminar Sessão</a>
     </div>
 
     <?php if ($msg): ?><div class="alerta sucesso"><?= htmlspecialchars($msg) ?></div><?php endif; ?>
     <?php if ($erro): ?><div class="alerta erro"><?= htmlspecialchars($erro) ?></div><?php endif; ?>
 
-    <form method="GET" action="index.php" class="filter-bar">
-        <input type="hidden" name="m" value="pedidos"><input type="hidden" name="a" value="listar">
-        <select name="estado">
-            <option value="">Todos os estados</option>
-            <?php foreach ($ESTADOS as $valor => $label): ?>
-                <option value="<?= $valor ?>" <?= $filtro_estado === $valor ? 'selected' : '' ?>><?= $label ?></option>
-            <?php endforeach; ?>
-        </select>
-        <button type="submit">Filtrar</button>
-        <?php if ($filtro_estado !== ''): ?>
-            <a href="<?= e(urlModulo('pedidos', 'listar')) ?>" class="btn-limpar">Limpar</a>
-        <?php endif; ?>
-    </form>
+    <div class="filtro-pedidos">
+    <nav class="segmentado" aria-label="Filtrar por estado">
+        <a href="<?= e(urlModulo('pedidos', 'listar')) ?>" class="<?= $filtro_estado === '' ? 'on' : '' ?>"<?= $filtro_estado === '' ? ' aria-current="true"' : '' ?>>Todos</a>
+        <?php foreach ($ESTADOS as $valor => $label): ?>
+            <a href="<?= e(urlModulo('pedidos', 'listar', ['estado' => $valor])) ?>" class="<?= $filtro_estado === $valor ? 'on' : '' ?>"<?= $filtro_estado === $valor ? ' aria-current="true"' : '' ?>><?= e($label) ?></a>
+        <?php endforeach; ?>
+    </nav>
+    </div>
 
     <?php if (empty($pedidos)): ?>
         <div class="sem-cards">Nenhum pedido encontrado.</div>

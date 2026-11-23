@@ -26,11 +26,11 @@ $segredo2fa = $tem2fa ? '' : (string)$_SESSION['totp_pendente'];
     .perfil-layout { display: grid; grid-template-columns: 300px 1fr; gap: 2.5rem; align-items: start; max-width: 1100px; }
     @media (max-width: 900px) { .perfil-layout { grid-template-columns: 1fr; } }
     .perfil-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--raio); padding: 2rem; text-align: center; }
-    .avatar-preview { width: 160px; height: 160px; border-radius: 50%; object-fit: cover; border: 3px solid var(--gold); margin: 0 auto 1.5rem; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: var(--gold); font-family: 'Cinzel', serif; background: var(--superficie); }
-    .perfil-card h2 { font-family: 'Cinzel', serif; font-size: 1.4rem; margin-bottom: 0.5rem; }
+    .avatar-preview { width: 160px; height: 160px; border-radius: 50%; object-fit: cover; border: 3px solid var(--gold); margin: 0 auto 1.5rem; display: flex; align-items: center; justify-content: center; font-size: 3rem; color: var(--gold); font-weight: 600; letter-spacing: -0.02em; background: var(--superficie); }
+    .perfil-card h2 { font-weight: 600; letter-spacing: -0.02em; font-size: 1.4rem; margin-bottom: 0.5rem; }
     .perfil-card p { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.2rem; }
     .form-section { background: var(--card); border: 1px solid var(--border); border-radius: var(--raio); padding: 2rem; margin-bottom: 1.5rem; }
-    .form-section h3 { font-family: 'Cinzel', serif; font-size: 1.2rem; color: var(--gold); margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    .form-section h3 { font-weight: 600; letter-spacing: -0.02em; font-size: 1.2rem; color: var(--gold); margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
     .file-upload-wrapper { border: 2px dashed var(--border); padding: 1rem; border-radius: var(--raio-campo); text-align: center; transition: 0.3s; }
     details.password-toggle { border: 1px solid var(--border); border-radius: var(--raio-campo); overflow: hidden; margin-top: 1rem; }
     details.password-toggle summary { padding: 1rem; cursor: pointer; font-weight: 500; list-style: none; display: flex; justify-content: space-between; align-items: center; background: var(--superficie); }
@@ -43,7 +43,6 @@ $segredo2fa = $tem2fa ? '' : (string)$_SESSION['totp_pendente'];
 <div class="main-content">
     <div class="header">
         <h1>O Meu Perfil</h1>
-        <a href="logout.php" class="btn-logout">Terminar Sessão</a>
     </div>
 
     <?php if ($msg): ?><div class="alerta sucesso"><?= htmlspecialchars($msg) ?></div><?php endif; ?>
@@ -132,7 +131,7 @@ $segredo2fa = $tem2fa ? '' : (string)$_SESSION['totp_pendente'];
                         <summary><?= $tem2fa ? 'Desativar 2FA (verificação em dois passos)' : 'Ativar 2FA (verificação em dois passos)' ?></summary>
                         <div class="details-content">
                             <?php if ($tem2fa): ?>
-                                <p style="color: #4ade80; margin-bottom: 1rem;">✅ O login pede o código da tua app autenticadora.</p>
+                                <p style="color: #4ade80; margin-bottom: 1rem;">O login pede o código da tua app autenticadora.</p>
                                 <form method="POST" action="<?= e(urlModulo('perfil', 'desativar_dois_fatores')) ?>">
                                     <?= campoCsrf() ?>
                                     <div class="input-group">

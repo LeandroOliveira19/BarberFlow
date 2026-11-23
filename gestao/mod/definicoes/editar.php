@@ -21,7 +21,7 @@ function cfg(string $key, string $default = ''): string {
     .grid-definicoes { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem; align-items: start; }
     @media (max-width: 900px) { .grid-definicoes { grid-template-columns: 1fr; } }
     .card { background: var(--card); border-radius: var(--raio); border: 1px solid var(--border); padding: 2rem; }
-    .card h2 { font-family: 'Cinzel', serif; font-size: 1.2rem; color: var(--gold); margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
+    .card h2 { font-weight: 600; letter-spacing: -0.02em; font-size: 1.2rem; color: var(--gold); margin-bottom: 1.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.5rem; }
     .input-group input[type="color"] { padding: 0.2rem; height: 42px; cursor: pointer; }
     .btn-submit { max-width: 300px; margin-left: auto; display: block; font-size: 1rem; }
 </style>
@@ -32,7 +32,6 @@ function cfg(string $key, string $default = ''): string {
             <h1>Definições</h1>
             <p>Personaliza a identidade e a aparência da tua barbearia.</p>
         </div>
-        <a href="logout.php" class="btn-logout">Terminar Sessão</a>
     </div>
 
     <?php if ($msg): ?><div class="alerta sucesso"><?= $msg ?></div><?php endif; ?>
@@ -154,12 +153,12 @@ function cfg(string $key, string $default = ''): string {
             
             <?php if (!empty($config['google_place_id'])): ?>
                 <p style="color: #4ade80; margin-bottom: 1.5rem; font-weight: 500;">
-                    ✅ ID do Google Maps: <?= htmlspecialchars($config['google_place_id']) ?><br>
+                    ID do Google Maps: <?= htmlspecialchars($config['google_place_id']) ?><br>
                     <small style="color: var(--muted); font-weight: normal;">As avaliações estão a ser carregadas através da Apify.</small>
                 </p>
             <?php else: ?>
                 <p style="color: #f87171; margin-bottom: 1.5rem; font-weight: 500;">
-                    ❌ Nenhum ID do Google Maps configurado. Contacta o suporte.
+                    Nenhum ID do Google Maps configurado. Contacta o suporte.
                 </p>
             <?php endif; ?>
         </div>

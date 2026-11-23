@@ -9,7 +9,7 @@ if (count(get_included_files()) === 1) { header('Location: ../../index.php'); ex
 </p>
 <form method="POST" action="<?= e(urlModulo('perfil', 'enviar_codigo')) ?>" style="margin-bottom: 1.5rem;">
     <?= campoCsrf() ?>
-    <button type="submit" class="btn-acao">📧 Enviar código para o meu email</button>
+    <button type="submit" class="btn-acao">Enviar código para o meu email</button>
 </form>
 <form method="POST" action="<?= e(urlModulo('perfil', 'alterar_password')) ?>">
     <?= campoCsrf() ?>

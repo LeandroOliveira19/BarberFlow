@@ -121,17 +121,14 @@ $idAberto = (int)($editar['id'] ?? $transferir['id'] ?? 0);
     .grid-stock { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; align-items: start; }
     @media (max-width: 900px) { .grid-stock { grid-template-columns: 1fr; } }
     .form-card { background: var(--card); border-radius: var(--raio); border: 1px solid var(--border); padding: 1.5rem; }
-    .form-card h2 { font-size: 1.2rem; margin-bottom: 1.5rem; color: var(--gold); font-family: 'Cinzel', serif; }
+    .form-card h2 { font-size: 1.2rem; margin-bottom: 1.5rem; color: var(--gold); font-weight: 600; letter-spacing: -0.02em; }
     .btn-cancelar { display: block; text-align: center; margin-top: 0.8rem; color: var(--muted); text-decoration: none; font-size: 0.85rem; }
 
     /* Estilos dos Filtros */
-    .filter-bar { padding: 1rem; background: var(--superficie); border: 1px solid var(--border); border-radius: var(--raio); margin-bottom: 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
-    .filter-bar input { flex: 1; min-width: 200px; padding: 0.6rem 1rem; background: var(--fundo); border: 1px solid var(--border); border-radius: var(--raio-campo); color: #fff; }
-    .filter-bar select { padding: 0.6rem 1rem; background: var(--fundo); border: 1px solid var(--border); border-radius: var(--raio-campo); color: #fff; }
-    .filter-bar button { padding: 0.6rem 1.5rem; background: var(--gold); color: #000; border: none; border-radius: var(--raio-campo); font-weight: 600; cursor: pointer; transition: 0.3s; }
-    .filter-bar button:hover { background: #e0be9a; }
-    .btn-limpar { color: var(--muted); text-decoration: none; font-size: 0.85rem; }
-    .btn-limpar:hover { color: #fff; }
+    .filter-bar { margin-bottom: 1.6rem; display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap; }
+    .pesquisa { flex: 1; min-width: 220px; display: flex; align-items: center; gap: 0.5rem; background: #1d1d1f; border-radius: 10px; padding: 0 0.8rem; }
+    .pesquisa svg { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+    .pesquisa input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--texto); font: inherit; font-size: 0.9rem; padding: 0.55rem 0; }
 
     /* Formulário de pedido de reposição (barbeiro) */
     .pedido-form { display: flex; gap: 0.4rem; align-items: center; }
@@ -146,7 +143,6 @@ $idAberto = (int)($editar['id'] ?? $transferir['id'] ?? 0);
                 <?= $eGestor ? 'Gere o catálogo de materiais e transfere stock para as bancadas.' : 'Os itens disponíveis na tua bancada e pedidos de reposição.' ?>
             </p>
         </div>
-        <a href="logout.php" class="btn-logout">Terminar Sessão</a>
     </div>
 
     <?php if ($msg): ?><div class="alerta sucesso"><?= htmlspecialchars($msg) ?></div><?php endif; ?>
@@ -160,18 +156,19 @@ $idAberto = (int)($editar['id'] ?? $transferir['id'] ?? 0);
         <div class="<?= $eGestor ? 'grid-stock' : '' ?>">
             <!-- Cards por categoria -->
             <div>
-                <form method="GET" action="index.php" class="filter-bar">
-                    <input type="hidden" name="m" value="stock"><input type="hidden" name="a" value="listar">
-                    <input type="text" name="q" value="<?= htmlspecialchars($filtro_busca) ?>" placeholder="Pesquisar por nome...">
-                    <select name="estado">
-                        <option value="">Todos os estados</option>
-                        <option value="low" <?= $filtro_estado === 'low' ? 'selected' : '' ?>>Apenas em falta</option>
-                    </select>
-                    <button type="submit">Filtrar</button>
-                    <?php if ($filtro_busca !== '' || $filtro_estado !== ''): ?>
-                        <a href="<?= e(urlModulo('stock', 'listar')) ?>" class="btn-limpar">Limpar</a>
-                    <?php endif; ?>
-                </form>
+                <?php $paramsBusca = $filtro_busca !== '' ? ['q' => $filtro_busca] : []; ?>
+                <div class="filter-bar">
+                    <form method="GET" action="index.php" class="pesquisa" role="search">
+                        <input type="hidden" name="m" value="stock"><input type="hidden" name="a" value="listar">
+                        <?php if ($filtro_estado === 'low'): ?><input type="hidden" name="estado" value="low"><?php endif; ?>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                        <input type="search" name="q" value="<?= e($filtro_busca) ?>" placeholder="Pesquisar materiais" aria-label="Pesquisar materiais">
+                    </form>
+                    <nav class="segmentado" aria-label="Filtrar por estado">
+                        <a href="<?= e(urlModulo('stock', 'listar', $paramsBusca)) ?>" class="<?= $filtro_estado !== 'low' ? 'on' : '' ?>">Todos</a>
+                        <a href="<?= e(urlModulo('stock', 'listar', $paramsBusca + ['estado' => 'low'])) ?>" class="<?= $filtro_estado === 'low' ? 'on' : '' ?>">Em falta</a>
+                    </nav>
+                </div>
 
                 <?php if (empty($materiais)): ?>
                     <div class="sem-cards">Nenhum item encontrado.</div>

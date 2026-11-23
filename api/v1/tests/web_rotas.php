@@ -893,11 +893,41 @@ function teste_visual(): void {
     ok(str_contains($h, 'family=Inter') && str_contains($h, '--raio: 28px') && !str_contains($h, 'gradiente-animado') && semErrosPhp($h), 'dashboard: visual novo, sem animações', $r);
 }
 
+/* ===================== Gestão v2: menu com grupos, cabeçalho fixo, dashboard, segmentados ===================== */
+function teste_gestao_v2(): void {
+    global $BASE, $pdo;
+    require_once __DIR__ . '/../../../config/modular.php';
+    ok(function_exists('saudacaoPorHora') && saudacaoPorHora(9) === 'Bom dia' && saudacaoPorHora(14) === 'Boa tarde'
+        && saudacaoPorHora(21) === 'Boa noite' && saudacaoPorHora(3) === 'Boa noite' && saudacaoPorHora(5) === 'Bom dia' && saudacaoPorHora(12) === 'Boa tarde',
+        'saudacaoPorHora: manhã, tarde e noite');
+    ok(function_exists('variacaoPercentual') && variacaoPercentual(110, 100) === 10 && variacaoPercentual(90, 100) === -10
+        && variacaoPercentual(50, 0) === null && variacaoPercentual(0, 0) === null && variacaoPercentual(100, 300) === -67,
+        'variacaoPercentual: sobe, desce e sem base');
+
+    $g = new Sessao($BASE); $g->login(TESTE_GESTOR);
+    $r = $g->get('gestao/index.php');
+    $h = $r['html'];
+    ok(str_contains($h, 'class="menu-grupo"') && str_contains($h, '>Negócio<') && str_contains($h, 'aria-label="Terminar sessão"') && !str_contains($h, 'btn-logout') && semErrosPhp($h), 'gestor: menu com grupos e sair no fundo', $r);
+    ok(str_contains($h, 'class="topo"') && str_contains($h, 'Ver site') && str_contains($h, 'index.php?slug=rlbarber'), 'gestor: cabeçalho fixo com Ver site', $r);
+    ok((bool)preg_match('/(Bom dia|Boa tarde|Boa noite), /', $h) && str_contains($h, 'class="lista"'), 'dashboard: saudação e listas agrupadas', $r);
+    $pend = (int)$pdo->query("SELECT COUNT(*) FROM pedidos_reposicao WHERE barbearia_id = 1 AND estado = 'pendente'")->fetchColumn();
+    ok($pend === 0 || str_contains($h, '<span class="contador">' . $pend . '</span>'), 'menu: contador de pedidos pendentes', $r);
+
+    $r = $g->get('gestao/index.php?m=pedidos&a=listar');
+    ok(str_contains($r['html'], 'class="segmentado"') && str_contains($r['html'], 'estado=pendente') && !str_contains($r['html'], '<select name="estado"'), 'pedidos: filtro segmentado', $r);
+    $r = $g->get('gestao/index.php?m=stock&a=listar&q=Material');
+    ok(str_contains($r['html'], 'class="segmentado"') && str_contains($r['html'], 'q=Material&amp;estado=low'), 'stock: segmentado mantém a pesquisa', $r);
+
+    $b = new Sessao($BASE); $b->login(TESTE_BARBEIRO);
+    $r = $b->get('gestao/index.php');
+    ok(str_contains($r['html'], 'class="menu-grupo"') && !str_contains($r['html'], '>Negócio<') && !str_contains($r['html'], 'Fornecedores') && semErrosPhp($r['html']), 'barbeiro: menu só com os seus grupos', $r);
+}
+
 /* ===================== Execução ===================== */
 try {
     criarUtilizadoresTeste($pdo);
     foreach (['teste_modular_helpers', 'teste_gestao_base', 'teste_agenda_perfil', 'teste_modulos_gestor',
-              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda', 'teste_login_seguro', 'teste_2fa_perfil', 'teste_senha_com_codigo', 'teste_convite_barbeiro', 'teste_revisao_seguranca', 'teste_auditoria_privilegios', 'teste_cookie_sessao', 'teste_visual'] as $t) {
+              'teste_stock_pedidos', 'teste_publico', 'teste_pesquisa_agenda', 'teste_login_seguro', 'teste_2fa_perfil', 'teste_senha_com_codigo', 'teste_convite_barbeiro', 'teste_revisao_seguranca', 'teste_auditoria_privilegios', 'teste_cookie_sessao', 'teste_visual', 'teste_gestao_v2'] as $t) {
         if (function_exists($t)) { echo "--- $t\n"; $t(); }
     }
 } finally {

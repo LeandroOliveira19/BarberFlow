@@ -39,6 +39,21 @@ if ($eGestor) {
     $concluidasMes = (int)$stmt->fetchColumn();
     $ticketMedio = $concluidasMes > 0 ? $receitaMes / $concluidasMes : 0.0;
 
+    // Receita do mesmo dia da semana anterior (para a comparação) e dos últimos 7 dias (mini-gráfico)
+    $stmt = $pdo->prepare("SELECT COALESCE(SUM(s.preco),0) FROM marcacoes m JOIN servicos s ON m.servico_id = s.id AND s.barbearia_id = m.barbearia_id WHERE m.barbearia_id = ? AND m.estado = 'concluida' AND DATE(m.inicio) = DATE_SUB(CURDATE(), INTERVAL 7 DAY)");
+    $stmt->execute([$bid]);
+    $variacaoHoje = variacaoPercentual($receitaHoje, (float)$stmt->fetchColumn());
+
+    $stmt = $pdo->prepare("SELECT DATE(m.inicio) AS dia, SUM(s.preco) AS total FROM marcacoes m JOIN servicos s ON m.servico_id = s.id AND s.barbearia_id = m.barbearia_id WHERE m.barbearia_id = ? AND m.estado = 'concluida' AND m.inicio >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) AND m.inicio < DATE_ADD(CURDATE(), INTERVAL 1 DAY) GROUP BY DATE(m.inicio)");
+    $stmt->execute([$bid]);
+    $porDia = $stmt->fetchAll(PDO::FETCH_KEY_PAIR);
+    $receita7dias = [];
+    for ($d = 6; $d >= 0; $d--) {
+        $dia = date('Y-m-d', strtotime("-$d day"));
+        $receita7dias[$dia] = (float)($porDia[$dia] ?? 0);
+    }
+    $maxReceita7 = max($receita7dias) ?: 1.0;
+
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM clientes WHERE barbearia_id = ? AND MONTH(criado_em) = MONTH(CURDATE()) AND YEAR(criado_em) = YEAR(CURDATE())");
     $stmt->execute([$bid]);
     $novosClientesMes = (int)$stmt->fetchColumn();
@@ -128,187 +143,192 @@ if ($eGestor) {
     $proximas = $stmt->fetchAll();
 }
 ?>
+<?php
+$primeiroNome = explode(' ', trim($nome))[0] ?? '';
+$icoStock   = '<path d="M21 8l-9-5-9 5 9 5 9-5zM3 8v8l9 5 9-5V8M12 13v8"/>';
+$icoPedido  = '<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 13l2 2 4-4"/>';
+$icoRelogio = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
+?>
 
 <style>
-    .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem; }
-    .kpi { background: var(--card); border: 1px solid var(--border); border-radius: var(--raio); padding: 1.4rem 1.5rem; border-left: 4px solid var(--gold); }
-    .kpi .label { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
-    .kpi .valor { font-size: 2rem; font-weight: 600; color: #fff; margin-top: 0.35rem; }
-    .kpi .valor small { font-size: 1rem; color: var(--gold); font-weight: 500; }
-    .kpi .sub { font-size: 0.78rem; color: #4ade80; margin-top: 0.3rem; }
+    .saudacao-data { color: var(--muted); font-size: 0.95rem; margin-bottom: 0.15rem; }
+    .header h1 .ouro { color: var(--gold); }
 
-    .alertas { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.25rem; margin-bottom: 1.5rem; }
-    .alerta-card { display: flex; align-items: center; gap: 1rem; padding: 1.1rem 1.4rem; border-radius: var(--raio); border: 1px solid var(--border); text-decoration: none; background: var(--card); transition: 0.25s; }
-    .alerta-card:hover { border-color: var(--gold); }
-    .alerta-card .ico { width: 42px; height: 42px; border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex: none; }
-    .alerta-card .num { font-size: 1.6rem; font-weight: 700; line-height: 1; }
-    .alerta-card .txt { font-size: 0.8rem; color: var(--muted); }
-    .alerta-card .seta { margin-left: auto; color: var(--muted); font-size: 1.2rem; }
-    .alerta-verde  .ico { background: rgba(34,197,94,0.15); }  .alerta-verde  .num { color: #4ade80; }
-    .alerta-vermelho .ico { background: rgba(239,68,68,0.15); } .alerta-vermelho .num { color: #f87171; }
-    .alerta-ambar   .ico { background: rgba(251,191,36,0.15); } .alerta-ambar   .num { color: #fbbf24; }
+    .kpis { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 2.4rem; }
+    .kpis > .kpi { flex: 1 1 180px; min-width: 0; }
+    .kpis > .kpi.destaque { flex: 2 1 320px; }
+    .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 24px; padding: 1.3rem 1.4rem; }
+    .kpi.destaque { background: radial-gradient(120% 140% at 0% 0%, rgba(205,164,124,0.22), transparent 60%), var(--card); }
+    .kpi .label { font-size: 0.82rem; color: var(--muted); }
+    .kpi .valor { font-size: 2.3rem; font-weight: 600; letter-spacing: -0.045em; color: var(--texto); margin-top: 0.2rem; line-height: 1.1; }
+    .kpi.destaque .valor { font-size: 3.1rem; }
+    .kpi .valor small { font-size: 0.55em; color: var(--muted); font-weight: 500; letter-spacing: 0; }
+    .kpi .sub { font-size: 0.8rem; color: var(--muted); margin-top: 0.3rem; }
+    .kpi .sobe { color: #30d158; } .kpi .desce { color: #ff453a; }
+    .spark { display: flex; align-items: flex-end; gap: 5px; height: 42px; margin-top: 0.8rem; }
+    .spark i { flex: 1; min-height: 3px; background: rgba(205,164,124,0.35); border-radius: 3px; }
+    .spark i:last-child { background: var(--gold); }
 
-    .painel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+    .secao-titulo { display: flex; align-items: center; gap: 0.6rem; font-size: 1.2rem; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 0.85rem; }
+    .secao-titulo .n { font-size: 0.8rem; font-weight: 400; color: var(--muted); }
+    .secao-titulo a { margin-left: auto; font-size: 0.85rem; font-weight: 500; color: var(--gold); text-decoration: none; }
+    .duas { display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.4rem; align-items: start; margin-bottom: 2.4rem; }
+    @media (max-width: 1000px) { .duas { grid-template-columns: 1fr; } }
+
+    .hora { width: 58px; flex: none; font-weight: 600; font-size: 0.95rem; font-variant-numeric: tabular-nums; }
+    .hora small { display: block; color: var(--muted); font-size: 0.72rem; font-weight: 400; }
+    .ico-lista { width: 36px; height: 36px; flex: none; border-radius: 10px; display: grid; place-items: center; }
+    .ico-lista svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    .ico-lista.vermelho { background: rgba(255,69,58,0.14); color: #ff453a; }
+    .ico-lista.ambar { background: rgba(255,214,10,0.13); color: #ffd60a; }
+    .ico-lista.verde { background: rgba(48,209,88,0.14); color: #30d158; }
+    .chev { color: #48484a; font-size: 1.1rem; }
+    .badge.confirmada { color: #30d158; background: rgba(48,209,88,0.14); }
+    .badge.pendente_verificacao { color: #ffd60a; background: rgba(255,214,10,0.13); }
+
+    .painel-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.4rem; }
     @media (max-width: 900px) { .painel-grid { grid-template-columns: 1fr; } }
-    .painel { background: var(--card); border: 1px solid var(--border); border-radius: var(--raio); padding: 1.5rem; }
-    .painel h3 { font-family: 'Cinzel', serif; font-size: 1.05rem; color: var(--gold); margin: 0 0 1rem; }
-
+    .painel { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 1.3rem 1.4rem; }
     .bar-row { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.6rem; font-size: 0.88rem; }
     .bar-label { width: 45%; color: var(--texto); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .bar-track { flex: 1; height: 8px; background: var(--superficie); border-radius: 999px; overflow: hidden; }
     .bar-fill { height: 100%; background: linear-gradient(90deg, #cda47c, #e0be9a); border-radius: 999px; }
     .bar-val { width: 2rem; text-align: right; color: var(--muted); }
-
     .rank-lista { list-style: none; margin: 0; padding: 0; }
-    .rank-lista li { display: flex; align-items: center; gap: 0.7rem; padding: 0.5rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
+    .rank-lista li { display: flex; align-items: center; gap: 0.7rem; padding: 0.55rem 0; border-bottom: 1px solid var(--linha); font-size: 0.9rem; }
     .rank-lista li:last-child { border-bottom: none; }
     .rank-pos { width: 24px; height: 24px; border-radius: 50%; background: var(--superficie); color: var(--gold); display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700; flex: none; }
     .rank-nome { color: var(--texto); flex: 1; }
     .rank-total { color: var(--muted); }
-
-    .proximas-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-    .proximas-table th { text-align: left; color: var(--muted); font-size: 0.75rem; text-transform: uppercase; padding: 0.6rem 0.8rem; border-bottom: 1px solid var(--border); }
-    .proximas-table td { padding: 0.65rem 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
-    .badge { padding: 0.22rem 0.5rem; border-radius: 999px; font-size: 0.72rem; font-weight: 600; }
-    .badge.confirmada { color: #4ade80; background: rgba(34,197,94,0.15); }
-    .badge.pendente_verificacao { color: #fbbf24; background: rgba(251,191,36,0.15); }
-    .vazio { color: var(--muted); font-size: 0.9rem; padding: 0.8rem 0; }
+    .vazio { color: var(--muted); font-size: 0.9rem; padding: 0.4rem 0; }
 </style>
 
 <div class="main-content">
     <div class="header">
         <div>
-            <h1>Dashboard</h1>
-            <p style="color: var(--muted); margin-top: 0.5rem;">
-                <?= $eGestor
-                    ? 'Check-up rápido do negócio: receita, marcações, stock e alertas.'
-                    : 'A tua agenda e o estado da tua bancada.' ?>
-            </p>
+            <p class="saudacao-data"><?= e(dataPorExtenso(time())) ?></p>
+            <h1><?= e(saudacaoPorHora((int)date('G'))) ?>, <span class="ouro"><?= e($primeiroNome) ?></span>.</h1>
         </div>
-        <a href="logout.php" class="btn-logout">Terminar Sessão</a>
     </div>
 
     <?php if ($eGestor): ?>
-        <!-- KPIs -->
         <div class="kpis">
-            <div class="kpi">
+            <div class="kpi destaque">
                 <div class="label">Receita hoje</div>
                 <div class="valor"><?= number_format($receitaHoje, 2, ',', '.') ?> <small>€</small></div>
+                <div class="sub">
+                    <?php if ($variacaoHoje === null): ?>
+                        Sem receita no mesmo dia da semana passada
+                    <?php else: ?>
+                        <span class="<?= $variacaoHoje >= 0 ? 'sobe' : 'desce' ?>"><?= $variacaoHoje >= 0 ? '▲' : '▼' ?> <?= abs($variacaoHoje) ?>%</span> face ao mesmo dia da semana passada
+                    <?php endif; ?>
+                </div>
+                <div class="spark" role="img" aria-label="Receita dos últimos 7 dias">
+                    <?php foreach ($receita7dias as $dia => $valor): ?>
+                        <i style="height: <?= max(4, (int)round($valor / $maxReceita7 * 100)) ?>%" title="<?= e(date('d/m', strtotime($dia)) . ': ' . number_format($valor, 2, ',', '.') . ' €') ?>"></i>
+                    <?php endforeach; ?>
+                </div>
             </div>
             <div class="kpi">
-                <div class="label">Receita este mês</div>
-                <div class="valor"><?= number_format($receitaMes, 2, ',', '.') ?> <small>€</small></div>
+                <div class="label">Marcações hoje</div>
+                <div class="valor"><?= $marcacoesHoje ?></div>
+                <div class="sub">receita do mês: <?= number_format($receitaMes, 2, ',', '.') ?> €</div>
             </div>
             <div class="kpi">
                 <div class="label">Ticket médio</div>
                 <div class="valor"><?= number_format($ticketMedio, 2, ',', '.') ?> <small>€</small></div>
+                <div class="sub">este mês · <?= $concluidasMes ?> serviços</div>
             </div>
             <div class="kpi">
-                <div class="label">Marcações hoje</div>
-                <div class="valor"><?= $marcacoesHoje ?></div>
-            </div>
-            <div class="kpi">
-                <div class="label">Clientes registados</div>
+                <div class="label">Clientes</div>
                 <div class="valor"><?= $totalClientes ?></div>
-                <div class="sub"><?= $novosClientesMes > 0 ? '+' . $novosClientesMes . ' este mês' : 'sem novos este mês' ?></div>
+                <div class="sub"><?= $novosClientesMes > 0 ? '<span class="sobe">+' . $novosClientesMes . '</span> este mês' : 'sem novos este mês' ?></div>
             </div>
         </div>
 
-        <!-- Alertas -->
-        <div class="alertas">
-            <a href="<?= urlModulo('stock', 'listar') ?>" class="alerta-card alerta-<?= $stockEmFalta > 0 ? 'vermelho' : 'verde' ?>">
-                <span class="ico">📦</span>
-                <div>
-                    <div class="num"><?= $stockEmFalta ?></div>
-                    <div class="txt">materiais em falta</div>
-                </div>
-                <span class="seta">→</span>
-            </a>
-            <a href="<?= urlModulo('pedidos', 'listar') ?>" class="alerta-card alerta-<?= $pedidosPendentes > 0 ? 'ambar' : 'verde' ?>">
-                <span class="ico">🔁</span>
-                <div>
-                    <div class="num"><?= $pedidosPendentes ?></div>
-                    <div class="txt">pedidos de reposição</div>
-                </div>
-                <span class="seta">→</span>
-            </a>
-            <a href="<?= urlModulo('agenda', 'listar') ?>" class="alerta-card alerta-<?= $porVerificar > 0 ? 'ambar' : 'verde' ?>">
-                <span class="ico">⏳</span>
-                <div>
-                    <div class="num"><?= $porVerificar ?></div>
-                    <div class="txt">marcações por verificar</div>
-                </div>
-                <span class="seta">→</span>
-            </a>
-        </div>
-
-        <!-- Painéis: serviços + barbeiros -->
-        <div class="painel-grid">
-            <div class="painel">
-                <h3>Serviços mais populares <span style="color:var(--muted); font-size:0.75rem;">(30 dias)</span></h3>
-                <?php if (empty($servicosPopulares)): ?>
-                    <div class="vazio">Ainda sem dados suficientes.</div>
-                <?php else: ?>
-                    <?php $maxS = max(array_column($servicosPopulares, 'total')); ?>
-                    <?php foreach ($servicosPopulares as $s): ?>
-                        <div class="bar-row">
-                            <span class="bar-label"><?= htmlspecialchars($s['nome']) ?></span>
-                            <div class="bar-track"><div class="bar-fill" style="width: <?= $maxS > 0 ? round(((int)$s['total'] / $maxS) * 100) : 0 ?>%"></div></div>
-                            <span class="bar-val"><?= (int)$s['total'] ?></span>
+        <div class="duas">
+            <div>
+                <h2 class="secao-titulo">Próximas marcações <a href="<?= e(urlModulo('agenda', 'listar')) ?>">Ver agenda</a></h2>
+                <div class="lista">
+                    <?php if (empty($proximas)): ?>
+                        <div class="lista-vazia">Sem marcações agendadas.</div>
+                    <?php endif; ?>
+                    <?php foreach ($proximas as $p): ?>
+                        <?php $ts = strtotime($p['inicio']); ?>
+                        <div class="lista-linha">
+                            <span class="hora"><?= date('H:i', $ts) ?><small><?= date('d/m', $ts) ?></small></span>
+                            <div class="txt"><b><?= e($p['cliente']) ?></b><small><?= e($p['servico']) ?> · com <?= e($p['barbeiro']) ?></small></div>
+                            <div class="dir"><span class="badge <?= e($p['estado']) ?>"><?= e($ESTADOS[$p['estado']] ?? $p['estado']) ?></span></div>
                         </div>
                     <?php endforeach; ?>
-                <?php endif; ?>
+                </div>
             </div>
-
-            <div class="painel">
-                <h3>Top barbeiros (faturação) <span style="color:var(--muted); font-size:0.75rem;">(30 dias)</span></h3>
-                <?php if (empty($topBarbeiros)): ?>
-                    <div class="vazio">Ainda sem dados.</div>
-                <?php else: ?>
-                    <ul class="rank-lista">
-                        <?php foreach ($topBarbeiros as $i => $b): ?>
-                            <li>
-                                <span class="rank-pos"><?= $i + 1 ?></span>
-                                <span class="rank-nome"><?= htmlspecialchars($b['nome']) ?></span>
-                                <span class="rank-total"><?= number_format((float)$b['receita'], 2, ',', '.') ?> € · <?= (int)$b['total'] ?> marc.</span>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
+            <div>
+                <h2 class="secao-titulo">Precisa de atenção</h2>
+                <div class="lista">
+                    <a class="lista-linha" href="<?= e(urlModulo('stock', 'listar', ['estado' => 'low'])) ?>">
+                        <span class="ico-lista <?= $stockEmFalta > 0 ? 'vermelho' : 'verde' ?>"><svg viewBox="0 0 24 24" aria-hidden="true"><?= $icoStock ?></svg></span>
+                        <div class="txt"><b><?= $stockEmFalta ?> <?= $stockEmFalta === 1 ? 'material em falta' : 'materiais em falta' ?></b><small>no stock geral</small></div>
+                        <div class="dir"><span class="chev">›</span></div>
+                    </a>
+                    <a class="lista-linha" href="<?= e(urlModulo('pedidos', 'listar', ['estado' => 'pendente'])) ?>">
+                        <span class="ico-lista <?= $pedidosPendentes > 0 ? 'ambar' : 'verde' ?>"><svg viewBox="0 0 24 24" aria-hidden="true"><?= $icoPedido ?></svg></span>
+                        <div class="txt"><b><?= $pedidosPendentes ?> <?= $pedidosPendentes === 1 ? 'pedido de reposição' : 'pedidos de reposição' ?></b><small>à espera de aprovação</small></div>
+                        <div class="dir"><span class="chev">›</span></div>
+                    </a>
+                    <a class="lista-linha" href="<?= e(urlModulo('agenda', 'listar')) ?>">
+                        <span class="ico-lista <?= $porVerificar > 0 ? 'ambar' : 'verde' ?>"><svg viewBox="0 0 24 24" aria-hidden="true"><?= $icoRelogio ?></svg></span>
+                        <div class="txt"><b><?= $porVerificar ?> <?= $porVerificar === 1 ? 'marcação por verificar' : 'marcações por verificar' ?></b><small>o cliente ainda não confirmou o código</small></div>
+                        <div class="dir"><span class="chev">›</span></div>
+                    </a>
+                </div>
             </div>
         </div>
 
-        <!-- Próximas marcações -->
-        <div class="painel">
-            <h3>Próximas marcações</h3>
-            <?php if (empty($proximas)): ?>
-                <div class="vazio">Sem marcações agendadas.</div>
-            <?php else: ?>
-                <table class="proximas-table">
-                    <thead>
-                        <tr><th>Data</th><th>Cliente</th><th>Barbeiro</th><th>Serviço</th><th>Estado</th></tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($proximas as $p): ?>
-                            <tr>
-                                <td><?= date('d/m H:i', strtotime($p['inicio'])) ?></td>
-                                <td><?= htmlspecialchars($p['cliente']) ?></td>
-                                <td><?= htmlspecialchars($p['barbeiro']) ?></td>
-                                <td><?= htmlspecialchars($p['servico']) ?></td>
-                                <td><span class="badge <?= htmlspecialchars($p['estado']) ?>"><?= htmlspecialchars($ESTADOS[$p['estado']] ?? $p['estado']) ?></span></td>
-                            </tr>
+        <div class="painel-grid">
+            <div>
+                <h2 class="secao-titulo">Serviços mais populares <span class="n">30 dias</span></h2>
+                <div class="painel">
+                    <?php if (empty($servicosPopulares)): ?>
+                        <div class="vazio">Ainda sem dados suficientes.</div>
+                    <?php else: ?>
+                        <?php $maxS = max(array_column($servicosPopulares, 'total')); ?>
+                        <?php foreach ($servicosPopulares as $s): ?>
+                            <div class="bar-row">
+                                <span class="bar-label"><?= e($s['nome']) ?></span>
+                                <div class="bar-track"><div class="bar-fill" style="width: <?= $maxS > 0 ? round(((int)$s['total'] / $maxS) * 100) : 0 ?>%"></div></div>
+                                <span class="bar-val"><?= (int)$s['total'] ?></span>
+                            </div>
                         <?php endforeach; ?>
-                    </tbody>
-                </table>
-            <?php endif; ?>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div>
+                <h2 class="secao-titulo">Top barbeiros <span class="n">faturação · 30 dias</span></h2>
+                <div class="painel">
+                    <?php if (empty($topBarbeiros)): ?>
+                        <div class="vazio">Ainda sem dados.</div>
+                    <?php else: ?>
+                        <ul class="rank-lista">
+                            <?php foreach ($topBarbeiros as $i => $b): ?>
+                                <li>
+                                    <span class="rank-pos"><?= $i + 1 ?></span>
+                                    <span class="rank-nome"><?= e($b['nome']) ?></span>
+                                    <span class="rank-total"><?= number_format((float)$b['receita'], 2, ',', '.') ?> € · <?= (int)$b['total'] ?> marc.</span>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php endif; ?>
+                </div>
+            </div>
         </div>
 
     <?php else: ?>
-        <!-- KPIs do barbeiro -->
         <div class="kpis">
-            <div class="kpi">
+            <div class="kpi destaque">
                 <div class="label">Marcações hoje</div>
                 <div class="valor"><?= $marcacoesHoje ?></div>
+                <div class="sub">na tua agenda</div>
             </div>
             <div class="kpi">
                 <div class="label">Serviços este mês</div>
@@ -320,27 +340,19 @@ if ($eGestor) {
             </div>
         </div>
 
-        <div class="painel">
-            <h3>Próximas marcações</h3>
+        <h2 class="secao-titulo">Próximas marcações <a href="<?= e(urlModulo('agenda', 'listar')) ?>">Ver agenda</a></h2>
+        <div class="lista">
             <?php if (empty($proximas)): ?>
-                <div class="vazio">Sem marcações agendadas.</div>
-            <?php else: ?>
-                <table class="proximas-table">
-                    <thead>
-                        <tr><th>Data</th><th>Cliente</th><th>Serviço</th><th>Estado</th></tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($proximas as $p): ?>
-                            <tr>
-                                <td><?= date('d/m H:i', strtotime($p['inicio'])) ?></td>
-                                <td><?= htmlspecialchars($p['cliente']) ?></td>
-                                <td><?= htmlspecialchars($p['servico']) ?></td>
-                                <td><span class="badge <?= htmlspecialchars($p['estado']) ?>"><?= htmlspecialchars($ESTADOS[$p['estado']] ?? $p['estado']) ?></span></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+                <div class="lista-vazia">Sem marcações agendadas.</div>
             <?php endif; ?>
+            <?php foreach ($proximas as $p): ?>
+                <?php $ts = strtotime($p['inicio']); ?>
+                <div class="lista-linha">
+                    <span class="hora"><?= date('H:i', $ts) ?><small><?= date('d/m', $ts) ?></small></span>
+                    <div class="txt"><b><?= e($p['cliente']) ?></b><small><?= e($p['servico']) ?></small></div>
+                    <div class="dir"><span class="badge <?= e($p['estado']) ?>"><?= e($ESTADOS[$p['estado']] ?? $p['estado']) ?></span></div>
+                </div>
+            <?php endforeach; ?>
         </div>
     <?php endif; ?>
 </div>

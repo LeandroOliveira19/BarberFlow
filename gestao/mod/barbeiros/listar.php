@@ -45,7 +45,6 @@ $bancadas_livres = $stmt->fetchAll();
 <div class="main-content">
     <div class="header">
         <h1>Gestão de Barbeiros</h1>
-        <a href="logout.php" class="btn-logout">Terminar Sessão</a>
     </div>
 
     <?php if ($erro): ?><div class="alerta erro"><?= $erro ?></div><?php endif; ?>
@@ -107,7 +106,7 @@ $bancadas_livres = $stmt->fetchAll();
                                     <form method="POST" action="<?= e(urlModulo('barbeiros', 'apagar')) ?>" style="display:inline;">
                                         <?= campoCsrf() ?>
                                         <input type="hidden" name="id" value="<?= $b['id'] ?>">
-                                        <button type="submit" class="btn-acao btn-perigo" onclick="return confirm('Desativar este barbeiro? A bancada ficará livre.')">X</button>
+                                        <button type="submit" class="btn-acao btn-perigo" onclick="return confirm('Desativar este barbeiro? A bancada ficará livre.')">Desativar</button>
                                     </form>
                                 <?php else: ?>
                                     <form method="POST" action="<?= e(urlModulo('barbeiros', 'ativar')) ?>" style="display:inline;">

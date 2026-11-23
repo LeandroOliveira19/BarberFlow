@@ -20,7 +20,7 @@ if (isset($_GET['editar'])) {
     .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; align-items: start; }
     @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
     .form-card { background: var(--card); border-radius: var(--raio); border: 1px solid var(--border); padding: 1.5rem; }
-    .form-card h2 { font-size: 1.2rem; margin-bottom: 1.5rem; color: var(--gold); font-family: 'Cinzel', serif; }
+    .form-card h2 { font-size: 1.2rem; margin-bottom: 1.5rem; color: var(--gold); font-weight: 600; letter-spacing: -0.02em; }
     .btn-cancelar { display: block; text-align: center; margin-top: 0.8rem; color: var(--muted); text-decoration: none; font-size: 0.85rem; }
     .acoes { display: flex; gap: 0.5rem; }
     .preco { color: var(--gold); font-weight: 500; }
@@ -29,7 +29,6 @@ if (isset($_GET['editar'])) {
 <div class="main-content">
     <div class="header">
         <h1>Gestão de Serviços</h1>
-        <a href="logout.php" class="btn-logout">Terminar Sessão</a>
     </div>
 
     <?php if ($msg): ?><div class="alerta sucesso"><?= htmlspecialchars($msg) ?></div><?php endif; ?>
@@ -61,7 +60,7 @@ if (isset($_GET['editar'])) {
                                     <form method="POST" action="<?= e(urlModulo('servicos', 'apagar')) ?>" style="display:inline;">
                                         <?= campoCsrf() ?>
                                         <input type="hidden" name="id" value="<?= $s['id'] ?>">
-                                        <button type="submit" class="btn-acao btn-perigo" onclick="return confirm('Desativar este serviço?')">X</button>
+                                        <button type="submit" class="btn-acao btn-perigo" onclick="return confirm('Desativar este serviço?')">Desativar</button>
                                     </form>
                                 </div>
                             </td>

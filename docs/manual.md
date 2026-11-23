@@ -35,6 +35,16 @@ Este manual explica como se usa o BarberFlow em cada perfil. Para instalar, ver 
 - **5 tentativas erradas** em 15 minutos bloqueiam o login durante esse tempo.
 - **Esqueci-me da senha:** escreve o email, recebes um código e escolhes uma senha nova.
 
+### Menu e Dashboard
+- **Menu lateral** em grupos: Hoje, Negócio, Stock e Conta.
+  - Os números dourados mostram as marcações de hoje (Agenda) e os pedidos de reposição pendentes.
+  - No fundo do menu estão o teu nome e o botão **Terminar sessão** (ícone de saída).
+- **Barra de cima:** mostra onde estás (Barbearia › Página). O botão **Ver site** abre o site público da barbearia.
+- **Dashboard:**
+  - a receita de hoje aparece em destaque, comparada com o mesmo dia da semana passada, com um gráfico dos últimos 7 dias;
+  - em baixo estão as próximas marcações e o que **precisa de atenção** (stock em falta, pedidos e marcações por verificar).
+- **Filtros:** os de Pedidos, Stock e Agenda são botões lado a lado (por exemplo Todos, Pendente, Aprovado…). Basta um clique.
+
 ### Agenda
 - **Vistas:** dia, semana ou próximos 90 dias.
 - **Filtros:** estado, barbeiro e **Pesquisar cliente** (por nome ou telemóvel).

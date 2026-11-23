@@ -72,3 +72,23 @@ function redirecionar(string $url): never {
 function likeSeguro(string $texto): string {
     return '%' . addcslashes($texto, '\\%_') . '%';
 }
+
+/** Saudação do dashboard: 5h–11h "Bom dia", 12h–19h "Boa tarde", o resto "Boa noite". */
+function saudacaoPorHora(int $hora): string {
+    if ($hora >= 5 && $hora < 12) return 'Bom dia';
+    if ($hora >= 12 && $hora < 20) return 'Boa tarde';
+    return 'Boa noite';
+}
+
+/** Variação em % (arredondada) de $anterior para $atual; null quando não há base de comparação. */
+function variacaoPercentual(float $atual, float $anterior): ?int {
+    if ($anterior <= 0) return null;
+    return (int)round(($atual - $anterior) / $anterior * 100);
+}
+
+/** Data por extenso em português, ex.: "Segunda-feira, 23 de novembro". */
+function dataPorExtenso(int $timestamp): string {
+    $dias  = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+    $meses = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+    return $dias[(int)date('w', $timestamp)] . ', ' . (int)date('j', $timestamp) . ' de ' . $meses[(int)date('n', $timestamp) - 1];
+}

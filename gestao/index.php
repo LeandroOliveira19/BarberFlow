@@ -90,8 +90,16 @@ $conteudo = (string)ob_get_clean();
 /* ---------- 5. Desenhar a página ---------- */
 $mensagens = lerFlashes();
 require __DIR__ . '/layout/cabecalho.php';
-require __DIR__ . '/layout/menu.php';
-if ($mensagens): ?>
+require __DIR__ . '/layout/menu.php';   // define $tituloPagina e $barbeariaMenu
+?>
+<div class="area">
+    <header class="topo">
+        <span class="topo-caminho"><?= e((string)$barbeariaMenu['nome']) ?> <span aria-hidden="true">›</span> <b><?= e($tituloPagina) ?></b></span>
+        <?php if ($barbeariaMenu['slug'] !== ''): ?>
+            <a class="topo-pilula" href="<?= e('../index.php?slug=' . rawurlencode((string)$barbeariaMenu['slug'])) ?>" target="_blank" rel="noopener">Ver site</a>
+        <?php endif; ?>
+    </header>
+<?php if ($mensagens): ?>
     <div class="flashes">
         <?php foreach ($mensagens as $f): ?>
             <div class="flash flash-<?= e($f['tipo']) ?>"><?= e($f['texto']) ?></div>
@@ -99,4 +107,5 @@ if ($mensagens): ?>
     </div>
 <?php endif;
 echo $conteudo;
+echo "</div>\n";
 require __DIR__ . '/layout/rodape.php';

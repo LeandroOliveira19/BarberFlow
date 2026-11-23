@@ -19,7 +19,7 @@ if (isset($_GET['editar'])) {
     .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; align-items: start; }
     @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
     .form-card { background: var(--card); border-radius: var(--raio); border: 1px solid var(--border); padding: 1.5rem; }
-    .form-card h2 { font-size: 1.2rem; margin-bottom: 1.5rem; color: var(--gold); font-family: 'Cinzel', serif; }
+    .form-card h2 { font-size: 1.2rem; margin-bottom: 1.5rem; color: var(--gold); font-weight: 600; letter-spacing: -0.02em; }
     .btn-cancelar { display: block; text-align: center; margin-top: 0.8rem; color: var(--muted); text-decoration: none; font-size: 0.85rem; }
     .btn-acao { text-decoration: none; color: #fff; background: var(--superficie); border: 1px solid rgba(255,255,255,0.1); padding: 0.3rem 0.6rem; border-radius: 999px; font-size: 0.8rem; transition: 0.3s; cursor: pointer; }
     .btn-acao:hover { border-color: var(--gold); color: var(--gold); }
@@ -28,7 +28,6 @@ if (isset($_GET['editar'])) {
 <div class="main-content">
     <div class="header">
         <h1>Gestão de Fornecedores</h1>
-        <a href="logout.php" class="btn-logout">Terminar Sessão</a>
     </div>
 
     <?php if ($msg): ?><div class="alerta sucesso"><?= htmlspecialchars($msg) ?></div><?php endif; ?>

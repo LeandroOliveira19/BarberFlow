@@ -47,7 +47,7 @@ usort($bancadas, fn($a, $b) => [(int)$b['ativo'], $faltasPorBancada[(int)$b['id'
     .bancada-card.inativa { opacity: 0.55; }
 
     .card-head { padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: flex-start; gap: 0.8rem; }
-    .card-head h3 { font-family: 'Cinzel', serif; font-size: 1.05rem; color: #fff; margin: 0; }
+    .card-head h3 { font-weight: 600; letter-spacing: -0.02em; font-size: 1.05rem; color: #fff; margin: 0; }
     .card-head .barbeiro { color: var(--gold); font-size: 0.85rem; margin-top: 0.25rem; }
     .head-badges { display: flex; flex-direction: column; align-items: flex-end; gap: 0.3rem; flex: none; }
 
@@ -77,14 +77,15 @@ usort($bancadas, fn($a, $b) => [(int)$b['ativo'], $faltasPorBancada[(int)$b['id'
     .card-foot { padding: 0.9rem 1.4rem; border-top: 1px solid var(--border); display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
 
     .form-toggle { margin-bottom: 1.5rem; }
-    .form-toggle summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; background: var(--gold); color: var(--fundo); font-weight: 700; padding: 0.75rem 1.3rem; border-radius: var(--raio-campo); transition: 0.25s; user-select: none; }
+    .form-toggle summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; background: var(--gold); color: var(--fundo); font-weight: 500; padding: 0.65rem 1.3rem; border-radius: 999px; transition: 0.25s; user-select: none; }
     .form-toggle summary:hover { background: #e0be9a; }
     .form-toggle summary::-webkit-details-marker { display: none; }
-    .form-toggle[open] summary { background: var(--superficie); color: var(--gold); border: 1px solid var(--gold); }
+    .form-toggle[open] summary { background: var(--superficie); color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold); }
     .form-card { background: var(--card); border-radius: var(--raio); border: 1px solid var(--border); overflow: hidden; max-width: 440px; margin-top: 1.25rem; }
     .form-head { display: flex; align-items: center; gap: 0.8rem; padding: 1.1rem 1.5rem; border-bottom: 1px solid var(--border); background: rgba(205,164,124,0.06); }
-    .form-ico { width: 38px; height: 38px; border-radius: 20px; background: rgba(205,164,124,0.15); color: var(--gold); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; flex: none; }
-    .form-head h2 { color: #fff; font-size: 1.1rem; margin: 0; font-family: 'Cinzel', serif; }
+    .form-ico { width: 38px; height: 38px; border-radius: 20px; background: rgba(205,164,124,0.15); color: var(--gold); display: flex; align-items: center; justify-content: center; flex: none; }
+    .form-ico svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .form-head h2 { color: #fff; font-size: 1.1rem; margin: 0; font-weight: 600; letter-spacing: -0.02em; }
     .form-head p { color: var(--muted); font-size: 0.8rem; margin: 0.15rem 0 0; }
     .form-body { padding: 1.5rem; }
 </style>
@@ -95,16 +96,15 @@ usort($bancadas, fn($a, $b) => [(int)$b['ativo'], $faltasPorBancada[(int)$b['id'
             <h1>Gestão de Bancadas</h1>
             <p style="color: var(--muted); margin-top: 0.5rem;">Consulta o equipamento e os consumíveis de cada barbeiro.</p>
         </div>
-        <a href="logout.php" class="btn-logout">Terminar Sessão</a>
     </div>
 
     <?php if ($msg): ?><div class="alerta sucesso"><?= htmlspecialchars($msg) ?></div><?php endif; ?>
 
     <details class="form-toggle" <?= $editar ? 'open' : '' ?>>
-        <summary><?= $editar ? '✏️ Editar Bancada' : '➕ Nova Bancada' ?></summary>
+        <summary><?= $editar ? 'Editar Bancada' : 'Nova Bancada' ?></summary>
         <div class="form-card">
             <div class="form-head">
-                <span class="form-ico"><?= $editar ? '✏️' : '➕' ?></span>
+                <span class="form-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><?= $editar ? '<path d="M4 20h4L19 9l-4-4L4 16v4zM13.5 6.5l4 4"/>' : '<rect x="3" y="11" width="18" height="4" rx="1"/><path d="M5 15v6M19 15v6M8 11V5h8v6"/>' ?></svg></span>
                 <div>
                     <h2><?= $editar ? 'Editar Bancada' : 'Nova Bancada' ?></h2>
                     <p><?= $editar ? 'Altera o nome ou o barbeiro atribuído.' : 'Cria uma bancada e atribui um barbeiro.' ?></p>
@@ -213,7 +213,7 @@ usort($bancadas, fn($a, $b) => [(int)$b['ativo'], $faltasPorBancada[(int)$b['id'
         <?php endforeach; ?>
 
         <?php if (empty($bancadas)): ?>
-            <div class="alerta erro">Ainda não existem bancadas.</div>
+            <div class="sem-cards" style="grid-column: 1 / -1;">Ainda não existem bancadas. Cria a primeira em <strong>Nova Bancada</strong>.</div>
         <?php endif; ?>
     </div>
 

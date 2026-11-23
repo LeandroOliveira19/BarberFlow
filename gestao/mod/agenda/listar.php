@@ -84,11 +84,10 @@ $slug = (string)$sl->fetchColumn();
 
 <style>
     .toolbar { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; background: var(--card); border: 1px solid var(--border); border-radius: var(--raio); padding: 1rem 1.2rem; margin-bottom: 1.5rem; }
-    .tabs, .nav-data { display: flex; gap: 0.4rem; align-items: center; }
-    .tabs a, .nav-data a { color: var(--muted); text-decoration: none; padding: 0.5rem 1rem; border-radius: var(--raio-campo); font-size: 0.9rem; border: 1px solid transparent; transition: 0.3s; }
-    .tabs a:hover, .nav-data a:hover { color: var(--gold); }
-    .tabs a.active { background: rgba(205,164,124,0.12); color: var(--gold); border-color: rgba(205,164,124,0.3); }
-    .intervalo { font-family: 'Cinzel', serif; font-size: 1.05rem; padding: 0 0.6rem; min-width: 160px; text-align: center; }
+    .nav-data { display: flex; gap: 0.4rem; align-items: center; }
+    .nav-data a { color: var(--muted); text-decoration: none; padding: 0.5rem 1rem; border-radius: var(--raio-campo); font-size: 0.9rem; border: 1px solid transparent; transition: 0.3s; }
+    .nav-data a:hover { color: var(--gold); }
+    .intervalo { font-weight: 600; letter-spacing: -0.02em; font-size: 1.05rem; padding: 0 0.6rem; min-width: 160px; text-align: center; }
     .filtros { display: flex; gap: 0.6rem; flex-wrap: wrap; }
     .filtros select, .filtros input, .filtros button { background: var(--superficie); color: var(--texto); border: 1px solid var(--border); border-radius: var(--raio-campo); padding: 0.5rem 0.8rem; font-family: inherit; font-size: 0.9rem; }
     .filtros button { cursor: pointer; color: var(--gold); border-color: rgba(205,164,124,0.3); }
@@ -96,7 +95,7 @@ $slug = (string)$sl->fetchColumn();
     .resumo div { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--gold); border-radius: 20px; padding: 1rem 1.2rem; }
     .resumo small { display: block; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; }
     .resumo strong { font-size: 1.7rem; font-weight: 500; }
-    .dia-titulo { font-family: 'Cinzel', serif; color: var(--gold); font-size: 1.1rem; margin: 2rem 0 0.8rem; }
+    .dia-titulo { font-weight: 600; letter-spacing: -0.02em; color: var(--gold); font-size: 1.1rem; margin: 2rem 0 0.8rem; }
     .dia-titulo:first-child { margin-top: 0; }
     .marcacao { display: grid; grid-template-columns: 110px 1fr auto auto; gap: 1.2rem; align-items: center; background: var(--card); border: 1px solid var(--border); border-radius: var(--raio); padding: 1.1rem 1.4rem; margin-bottom: 0.7rem; }
     .marcacao.cancelada, .marcacao.expirada { opacity: 0.55; }
@@ -129,15 +128,14 @@ $slug = (string)$sl->fetchColumn();
             <h1>Agenda</h1>
             <p><?= $eGestor ? 'Todas as marcações da barbearia' : 'As tuas marcações' ?> · <?= e($nome_utilizador) ?> (<?= e(ucfirst($tipo)) ?>)</p>
         </div>
-        <a href="logout.php" class="btn-logout">Terminar Sessão</a>
     </div>
 
     <div class="toolbar">
-        <div class="tabs">
-            <a href="<?= e(urlAgenda(['vista' => 'dia'])) ?>"      class="<?= $vista === 'dia' ? 'active' : '' ?>">Dia</a>
-            <a href="<?= e(urlAgenda(['vista' => 'semana'])) ?>"   class="<?= $vista === 'semana' ? 'active' : '' ?>">Semana</a>
-            <a href="<?= e(urlAgenda(['vista' => 'proximas'])) ?>" class="<?= $vista === 'proximas' ? 'active' : '' ?>">Próximas</a>
-        </div>
+        <nav class="segmentado" aria-label="Vista da agenda">
+            <a href="<?= e(urlAgenda(['vista' => 'dia'])) ?>"      class="<?= $vista === 'dia' ? 'on' : '' ?>">Dia</a>
+            <a href="<?= e(urlAgenda(['vista' => 'semana'])) ?>"   class="<?= $vista === 'semana' ? 'on' : '' ?>">Semana</a>
+            <a href="<?= e(urlAgenda(['vista' => 'proximas'])) ?>" class="<?= $vista === 'proximas' ? 'on' : '' ?>">Próximas</a>
+        </nav>
 
         <div class="nav-data">
             <?php if ($passo): ?>
